@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+  drawables.xml — Drawable resource declarations for Oh-My-Wrist.
+
+  • LauncherIcon       — widget glance bitmap (Connect IQ store).
+  • GlyphPlusGreen … GlyphDotWhite
+                       — 8 static status-column bitmaps, one per glyph/color
+                         combo.  Pixel-identical dimensions guarantee column
+                         alignment despite proportional system fonts.
+  • Spinner0 … Spinner6
+                       — 7 amber bracketed frames ([·] [✦] [✧] [✶] [✷] [✸] [✹])
+                         cycled at 150 ms cadence on FLAG_SPINNER rows.
+
+  Regenerate with:  python tools/build_spinner_frames.py
+-->
+<drawables>
+    <bitmap id="LauncherIcon" filename="app_icon.png"/>
+
+    <!-- Static status glyphs (8) -->
+    <bitmap id="GlyphPlusGreen"     filename="glyph_plus_green.png"/>
+    <bitmap id="GlyphMinusWhite"    filename="glyph_minus_white.png"/>
+    <bitmap id="GlyphTildeChrome"   filename="glyph_tilde_chrome.png"/>
+    <bitmap id="GlyphBangAmber"     filename="glyph_bang_amber.png"/>
+    <bitmap id="GlyphQuestionAmber" filename="glyph_question_amber.png"/>
+    <bitmap id="GlyphXChrome"       filename="glyph_x_chrome.png"/>
+    <bitmap id="GlyphXAmber"        filename="glyph_x_amber.png"/>
+    <bitmap id="GlyphDotWhite"      filename="glyph_dot_white.png"/>
+
+    <!-- Spinner frames (7): [·] [✦] [✧] [✶] [✷] [✸] [✹] -->
+    <bitmap id="Spinner0" filename="spinner_0.png"/>
+    <bitmap id="Spinner1" filename="spinner_1.png"/>
+    <bitmap id="Spinner2" filename="spinner_2.png"/>
+    <bitmap id="Spinner3" filename="spinner_3.png"/>
+    <bitmap id="Spinner4" filename="spinner_4.png"/>
+    <bitmap id="Spinner5" filename="spinner_5.png"/>
+    <bitmap id="Spinner6" filename="spinner_6.png"/>
+</drawables>

@@ -1,0 +1,10 @@
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Node dependencies
+.opencode/node_modules/

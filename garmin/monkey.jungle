@@ -1,0 +1,21 @@
+# monkey.jungle — Connect IQ build configuration
+# Requires Garmin Connect IQ SDK 9.1+
+
+project.manifest = manifest.xml
+
+# Source files
+base.sourcePath = source
+
+# Resource directories (shared across all products)
+base.resourcePath = resources
+
+# Per-product overrides (add product-specific resources here if needed)
+venu3.resourcePath         = $(base.resourcePath)
+venu3s.resourcePath        = $(base.resourcePath)
+fenix7.resourcePath        = $(base.resourcePath)
+fenix7s.resourcePath       = $(base.resourcePath)
+fenix7x.resourcePath       = $(base.resourcePath)
+fenix843mm.resourcePath    = $(base.resourcePath)
+fenix847mm.resourcePath    = $(base.resourcePath)
+fr955.resourcePath         = $(base.resourcePath)
+fr265.resourcePath         = $(base.resourcePath)

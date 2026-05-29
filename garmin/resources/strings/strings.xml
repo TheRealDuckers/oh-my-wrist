@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<strings>
+    <!-- Application name (manifest) and title bar -->
+    <string id="AppName">Oh-My-Wrist</string>
+    <string id="AppTitle">✎_</string>
+
+    <!-- CLI-aesthetic headers -->
+    <string id="HeaderPrompt">[ admin@wrist:~$ ]</string>
+    <string id="StatsHeaderClaude">[ claude.session ]</string>
+    <string id="StatsHeaderOpenCode">[ opencode.session ]</string>
+</strings>

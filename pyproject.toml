@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oh-my-wrist"
+version = "0.1.0"
+description = "Display real-time AI coding assistant activity on a Garmin smartwatch via BLE."
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.12"
+authors = [{ name = "oh-my-wrist contributors" }]
+keywords = ["oh-my-wrist", "garmin", "ble", "bluetooth", "smartwatch", "developer-tools", "claude", "opencode"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Debuggers",
+]
+dependencies = [
+    "bless>=0.3; sys_platform != 'win32'",
+    "click>=8.1",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+    "winrt-windows-devices-bluetooth-genericattributeprofile>=3.1; sys_platform == 'win32'",
+    "winrt-windows-storage-streams>=3.1; sys_platform == 'win32'",
+    "winrt-windows-foundation>=3.1; sys_platform == 'win32'",
+]
+
+[project.scripts]
+oh-my-wrist = "ohm.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ohm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-mock>=3.12",
+]
