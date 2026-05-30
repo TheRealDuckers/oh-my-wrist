@@ -89,7 +89,10 @@ class OhMyWristUsageView extends WatchUi.View {
         var labelX = (w * 0.10).toNumber();
         var barX   = (w * 0.22).toNumber();
         var cellW  = (w * 0.05).toNumber();
-        var cellH  = Graphics.getFontHeight(Graphics.FONT_TINY);
+        // getFontHeight returns the full line box (incl. asc/descender
+        // leading); the visible glyphs only fill ~72% of it, so scale down to
+        // match the apparent text height rather than overshooting it.
+        var cellH  = (Graphics.getFontHeight(Graphics.FONT_TINY) * 72 / 100).toNumber();
         var filled = UsageModel.filledCells(pct);
 
         // Label (chrome).
