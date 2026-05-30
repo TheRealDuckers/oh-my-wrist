@@ -65,7 +65,7 @@ class TestCanonicalMapping:
         ],
     )
     def test_mapping(self, oc_event, expected):
-        result = adapt_opencode_event(_ev(oc_event))
+        result = adapt_opencode_event(_ev(oc_event, status_text="x", session_id="m"))
         if result is None:
             pytest.skip("Event suppressed by noise control")
         assert result.canonical_event == expected

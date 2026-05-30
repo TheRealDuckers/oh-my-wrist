@@ -52,10 +52,12 @@ class OhMyWristApp extends Application.AppBase {
     }
 
     // Return the initial view stack: [view, navigation delegate].
-    // The delegate enables swipe navigation between Status (0),
-    // Claude Stats (1), and OpenCode Stats (2).
+    // The delegate enables swipe navigation between Usage (0),
+    // History (1, initial), Claude Stats (2), and OpenCode Stats (3).
+    // History stays the initial view; swipe/UP reaches Usage, swipe/DOWN
+    // reaches the stats screens (which remain last).
     function getInitialView() {
-        return [new OhMyWristView(), new OhMyWristDelegate(0)];
+        return [new OhMyWristView(), new OhMyWristDelegate(1)];
     }
 
     // Called by the system when the widget is closed / times out.

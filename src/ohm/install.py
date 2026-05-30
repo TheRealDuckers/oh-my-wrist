@@ -45,6 +45,13 @@ _HOOK_EVENTS = {
 
 CLAUDE_SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 
+# statusLine integration — forwards /usage quota to the watch.  Unlike hooks
+# (a list), statusLine is single-valued, so we save any pre-existing command
+# and chain to it from our relay (see statusline_relay.py).
+_STATUSLINE_COMMAND = "oh-my-wrist statusline"
+_STATUSLINE_ENTRY = {"type": "command", "command": _STATUSLINE_COMMAND}
+_PREV_STATUSLINE_PATH = Path.home() / ".oh-my-wrist" / "prev_statusline"
+
 # ---------------------------------------------------------------------------
 # OpenCode plugin configuration
 # ---------------------------------------------------------------------------
@@ -121,16 +128,7 @@ def _is_hook_present(hooks_list: list[dict]) -> bool:
 
 def patch_claude_settings() -> None:
     """Merge the oh-my-wrist hook entries into Claude Code's settings.json."""
-    if CLAUDE_SETTINGS_PATH.exists():
-        try:
-            settings = json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            logger.warning(
-                "Existing settings.json is not valid JSON — creating a fresh one"
-            )
-            settings = {}
-    else:
-        settings = {}
+    settings = _load_claude_settings()
 
     hooks = settings.setdefault("hooks", {})
     changed = False
@@ -153,13 +151,7 @@ def patch_claude_settings() -> None:
 
 def remove_claude_hooks() -> None:
     """Remove oh-my-wrist hook entries from Claude Code's settings.json."""
-    if not CLAUDE_SETTINGS_PATH.exists():
-        return
-
-    try:
-        settings = json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return
+    settings = _load_claude_settings()
 
     hooks = settings.get("hooks", {})
     changed = False
@@ -175,6 +167,66 @@ def remove_claude_hooks() -> None:
     if changed:
         _atomic_write_json(CLAUDE_SETTINGS_PATH, settings)
         logger.info("Claude Code hooks removed from {}", CLAUDE_SETTINGS_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Claude Code statusLine patching (usage quota → watch)
+# ---------------------------------------------------------------------------
+
+
+def _load_claude_settings() -> dict:
+    """Return the parsed settings.json, or {} if absent/invalid."""
+    if not CLAUDE_SETTINGS_PATH.exists():
+        return {}
+    try:
+        return json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        logger.warning("Existing settings.json is not valid JSON — creating a fresh one")
+        return {}
+
+
+def patch_claude_statusline() -> None:
+    """Set our statusLine command, chaining any pre-existing one.
+
+    A user's existing statusLine (single-valued, unlike hooks) is saved to
+    ``_PREV_STATUSLINE_PATH`` so the relay can run it and pass its output
+    through; uninstall restores it.
+    """
+    settings = _load_claude_settings()
+    existing = settings.get("statusLine")
+
+    if isinstance(existing, dict) and existing.get("command") == _STATUSLINE_COMMAND:
+        logger.info("statusLine already configured — skipping")
+        return
+
+    # Preserve the user's prior statusLine command for chaining.
+    if isinstance(existing, dict) and isinstance(existing.get("command"), str):
+        _atomic_write_text(_PREV_STATUSLINE_PATH, existing["command"])
+        logger.info("Saved existing statusLine for chaining")
+
+    settings["statusLine"] = dict(_STATUSLINE_ENTRY)
+    _atomic_write_json(CLAUDE_SETTINGS_PATH, settings)
+    logger.info("Claude Code statusLine patched at {}", CLAUDE_SETTINGS_PATH)
+
+
+def remove_claude_statusline() -> None:
+    """Restore the saved statusLine (or remove ours) and clear the saved copy."""
+    settings = _load_claude_settings()
+    current = settings.get("statusLine")
+
+    # Only touch the setting if it is ours.
+    if isinstance(current, dict) and current.get("command") == _STATUSLINE_COMMAND:
+        if _PREV_STATUSLINE_PATH.exists():
+            prev = _PREV_STATUSLINE_PATH.read_text(encoding="utf-8").strip()
+            settings["statusLine"] = {"type": "command", "command": prev}
+            logger.info("Restored previous statusLine")
+        else:
+            settings.pop("statusLine", None)
+            logger.info("Removed oh-my-wrist statusLine")
+        _atomic_write_json(CLAUDE_SETTINGS_PATH, settings)
+
+    if _PREV_STATUSLINE_PATH.exists():
+        _PREV_STATUSLINE_PATH.unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -470,6 +522,7 @@ def install_all(provider: str = "both", project_root: Path | None = None) -> Non
     """
     if provider in ("claude", "both"):
         patch_claude_settings()
+        patch_claude_statusline()
 
     if provider in ("opencode", "both"):
         install_opencode_plugin(project_root)
@@ -482,6 +535,7 @@ def uninstall_all(provider: str = "both", project_root: Path | None = None) -> N
     """Remove hooks/plugins for the specified provider(s)."""
     if provider in ("claude", "both"):
         remove_claude_hooks()
+        remove_claude_statusline()
 
     if provider in ("opencode", "both"):
         remove_opencode_plugin(project_root)

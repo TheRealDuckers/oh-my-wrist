@@ -34,4 +34,8 @@
     <bitmap id="Spinner4" filename="spinner_4.png"/>
     <bitmap id="Spinner5" filename="spinner_5.png"/>
     <bitmap id="Spinner6" filename="spinner_6.png"/>
+
+    <!-- Usage-bar segment cells (htop-style): filled amber / dim empty -->
+    <bitmap id="BarFill"  filename="bar_fill.png"/>
+    <bitmap id="BarEmpty" filename="bar_empty.png"/>
 </drawables>

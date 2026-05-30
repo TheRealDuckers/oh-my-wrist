@@ -8,4 +8,5 @@
     <string id="HeaderPrompt">[ admin@wrist:~$ ]</string>
     <string id="StatsHeaderClaude">[ claude.session ]</string>
     <string id="StatsHeaderOpenCode">[ opencode.session ]</string>
+    <string id="UsageHeaderClaude">[ claude.usage ]</string>
 </strings>

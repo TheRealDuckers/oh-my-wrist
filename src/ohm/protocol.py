@@ -57,6 +57,11 @@ ALERT_CHAR_UUID = "12345678-1234-1234-1234-1234567890AE"
 STATS_CLAUDE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B0"
 STATS_OPENCODE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B1"
 
+# Claude usage / rate-limit quota payload (compact JSON, UTF-8, notifiable).
+# Carries the /usage-equivalent session (5-hour) and week (7-day) used
+# percentages.  Claude-only — OpenCode has no equivalent.
+USAGE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B2"
+
 # History wire protocol
 # ----------------------
 # Each notification on HISTORY_CHAR_UUID is one self-contained binary frame:
@@ -74,6 +79,12 @@ MAX_FRAME_LEN = 4 + ENTRY_TEXT_MAX  # = 22, fits ATT MTU 23
 
 # Maximum stats payload length in bytes
 MAX_STATS_LEN = 100
+
+# Maximum usage payload length in bytes. Realistic payloads are tiny
+# ({"s":100,"w":100} == 17 bytes) and must fit a single notify on the default
+# ATT MTU of 23 (~20 bytes usable). Enforced defensively in the daemon
+# (_push_usage skips oversized payloads).
+MAX_USAGE_LEN = 40
 
 # Alert type constants
 ALERT_NONE = 0x00

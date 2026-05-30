@@ -174,6 +174,16 @@ def status() -> None:
             hooks = data.get("hooks", {})
             hook_events = list(hooks.keys())
             click.echo(f"\nClaude Code hooks registered: {hook_events or 'none'}")
+            sl = data.get("statusLine")
+            sl_cmd = sl.get("command") if isinstance(sl, dict) else None
+            from ohm.install import _STATUSLINE_COMMAND
+
+            if sl_cmd == _STATUSLINE_COMMAND:
+                click.echo("Claude Code statusLine : oh-my-wrist (usage bars)")
+            elif sl_cmd:
+                click.echo(f"Claude Code statusLine : other ({sl_cmd})")
+            else:
+                click.echo("Claude Code statusLine : not configured")
         except Exception:
             click.echo("\nCould not read Claude Code settings.json")
     else:
@@ -223,6 +233,7 @@ def install(provider: str, project_root: Path | None) -> None:
     from ohm.install import (
         install_service,
         patch_claude_settings,
+        patch_claude_statusline,
         install_opencode_plugin,
     )
 
@@ -237,7 +248,8 @@ def install(provider: str, project_root: Path | None) -> None:
         click.echo(f"Step {step}/{total} — Patching Claude Code settings.json…")
         try:
             patch_claude_settings()
-            click.echo("  ✔ Claude Code hooks configured.")
+            patch_claude_statusline()
+            click.echo("  ✔ Claude Code hooks + statusLine configured.")
         except Exception as exc:
             click.echo(f"  ✗ Failed to patch settings: {exc}", err=True)
         step += 1
@@ -288,6 +300,7 @@ def uninstall(provider: str, project_root: Path | None) -> None:
     """Remove AI provider hooks and the system service registration."""
     from ohm.install import (
         remove_claude_hooks,
+        remove_claude_statusline,
         remove_opencode_plugin,
         uninstall_service,
     )
@@ -296,7 +309,8 @@ def uninstall(provider: str, project_root: Path | None) -> None:
         click.echo("Removing Claude Code hooks…")
         try:
             remove_claude_hooks()
-            click.echo("  ✔ Hooks removed.")
+            remove_claude_statusline()
+            click.echo("  ✔ Hooks + statusLine removed.")
         except Exception as exc:
             click.echo(f"  ✗ {exc}", err=True)
 
@@ -327,6 +341,19 @@ def uninstall(provider: str, project_root: Path | None) -> None:
 def hook_cmd() -> None:
     """Entry point invoked by Claude Code hook events (reads JSON from stdin)."""
     from ohm.hook_relay import main as relay_main
+
+    relay_main()
+
+
+# ---------------------------------------------------------------------------
+# statusline  (called by Claude Code statusLine command)
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="statusline")
+def statusline_cmd() -> None:
+    """Entry point for the Claude Code statusLine (reads JSON from stdin)."""
+    from ohm.statusline_relay import main as relay_main
 
     relay_main()
 
