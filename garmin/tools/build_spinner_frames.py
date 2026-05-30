@@ -49,12 +49,6 @@ COLOR_GREEN = (0x55, 0xDD, 0x55, 0xFF)  # Palette.done()
 COLOR_WHITE = (0xFF, 0xFF, 0xFF, 0xFF)  # Palette.text()
 COLOR_CHROME = (0x88, 0x88, 0x88, 0xFF)  # Palette.chrome()
 
-# Usage-bar segment cells (htop-style).  filled = amber block, empty = dim
-# chrome outline.  Identically sized so 10 cells align in a rigid grid.
-BAR_CELL_W = 14
-BAR_CELL_H = 20
-BAR_COLOR_EMPTY = (0x44, 0x44, 0x44, 0xFF)  # dim chrome for unfilled cells
-
 # ---------------------------------------------------------------------------
 # Glyph definitions
 # ---------------------------------------------------------------------------
@@ -230,24 +224,6 @@ def render_glyph(
 # ---------------------------------------------------------------------------
 
 
-def render_bar_cell(filled: bool) -> Image.Image:
-    """Render a single usage-bar segment cell.
-
-    Filled cells are a solid amber block with a small inset; empty cells are a
-    dim outlined slot.  Both share BAR_CELL_W × BAR_CELL_H so 10 cells form a
-    rigid aligned grid.
-    """
-    img = Image.new("RGBA", (BAR_CELL_W, BAR_CELL_H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    inset = 1
-    box = [inset, inset, BAR_CELL_W - 1 - inset, BAR_CELL_H - 1 - inset]
-    if filled:
-        draw.rectangle(box, fill=COLOR_AMBER)
-    else:
-        draw.rectangle(box, outline=BAR_COLOR_EMPTY, width=1)
-    return img
-
-
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -302,13 +278,6 @@ def main() -> int:
         )
 
     print(f"\n  {len(STATIC_GLYPHS) + len(SPINNER_GLYPHS)} bitmaps generated.")
-
-    # --- Usage-bar segment cells ---
-    for filename, filled in (("bar_fill", True), ("bar_empty", False)):
-        img = render_bar_cell(filled)
-        out = OUT_DIR / f"{filename}.png"
-        img.save(out, "PNG")
-        print(f"  wrote {out.name:30s}  ({BAR_CELL_W}x{BAR_CELL_H})")
 
     return 0
 

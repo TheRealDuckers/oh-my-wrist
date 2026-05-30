@@ -8,13 +8,9 @@
 //   w  7-day week quota used percentage    (0..100, -1 = unknown/absent)
 //
 // -1 means the data is unavailable (API-key users, or before the first API
-// response in a session) — the view renders "n/a" for that row.
-//
-// Bar-cell bitmaps (bar_fill / bar_empty) are lazy-loaded once and shared by
-// the view, mirroring StatusModel's glyph loading.
+// response in a session) — the view draws an empty bar and no trailing value.
 
 using Toybox.Lang;
-using Toybox.WatchUi;
 
 module UsageModel {
 
@@ -23,24 +19,6 @@ module UsageModel {
 
     var sessionPct = -1;   // 5-hour window
     var weekPct    = -1;   // 7-day window
-
-    var barFill  as WatchUi.BitmapResource? = null;
-    var barEmpty as WatchUi.BitmapResource? = null;
-
-    // Lazy-load the two bar-cell bitmaps once.  Returns false if loading
-    // fails (trimmed build) so the view can fall back to ASCII.
-    function loadBitmaps() {
-        if (barFill != null) { return true; }
-        try {
-            barFill  = WatchUi.loadResource(Rez.Drawables.BarFill);
-            barEmpty = WatchUi.loadResource(Rez.Drawables.BarEmpty);
-            return true;
-        } catch (e) {
-            barFill = null;
-            barEmpty = null;
-            return false;
-        }
-    }
 
     // Number of filled cells (0..BAR_CELLS) for a percentage; -1 stays 0.
     function filledCells(pct) {

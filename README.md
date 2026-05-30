@@ -99,8 +99,9 @@ per-provider stats screens:
 | Claude Stats | DOWN | Session duration, tool calls, files edited, bash count, idle time |
 | OpenCode Stats | DOWN ×2 | Same metrics, isolated from Claude |
 
-The usage screen is Claude-only and shows `n/a` when quota data is unavailable
-(API-key users, or before the first API response in a session).
+The usage screen is Claude-only and shows an empty bar with no percentage
+when quota data is unavailable (API-key users, or before the first API
+response in a session).
 
 ### CLI Commands
 
