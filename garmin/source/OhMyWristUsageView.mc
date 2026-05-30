@@ -89,10 +89,16 @@ class OhMyWristUsageView extends WatchUi.View {
         var labelX = (w * 0.10).toNumber();
         var barX   = (w * 0.22).toNumber();
         var cellW  = (w * 0.05).toNumber();
-        // getFontHeight returns the full line box (incl. asc/descender
-        // leading); the visible glyphs only fill ~72% of it, so scale down to
-        // match the apparent text height rather than overshooting it.
-        var cellH  = (Graphics.getFontHeight(Graphics.FONT_TINY) * 72 / 100).toNumber();
+        // Match the bar to the *visible* glyph box, not the full font cell.
+        // getFontHeight = ascent + descent, but our chars (S/W/digits/%) have
+        // no descender, so their ink runs from the baseline up by `ascent`.
+        // With TEXT_JUSTIFY_VCENTER the font cell is centered on y, putting the
+        // baseline at y + (ascent - descent)/2.  Anchor the cell bottom to that
+        // baseline and size it to the ascent so top and bottom track the text.
+        var ascent  = Graphics.getFontAscent(Graphics.FONT_TINY);
+        var descent = Graphics.getFontDescent(Graphics.FONT_TINY);
+        var cellH   = ascent;
+        var cellY   = (y - (ascent + descent) / 2).toNumber();  // baseline - ascent
         var filled = UsageModel.filledCells(pct);
 
         // Label (chrome).
@@ -103,7 +109,6 @@ class OhMyWristUsageView extends WatchUi.View {
         );
 
         // Bar cells — filled = solid amber block, empty = dim outline.
-        var cellY = (y - cellH / 2).toNumber();
         var gap   = 1;
         var dim   = Palette.dim(Palette.chrome(), 50);
         for (var c = 0; c < UsageModel.BAR_CELLS; c++) {
