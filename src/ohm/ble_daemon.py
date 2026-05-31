@@ -41,6 +41,7 @@ Linux   : BlueZ D-Bus API (bless).
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import signal
 import sys
@@ -76,11 +77,13 @@ from ohm.protocol import (
     IPC_BACKEND,
     IpcMessage,
     MAX_FRAME_LEN,
+    MAX_USAGE_LEN,
     NAMED_PIPE_PATH,
     SESSION_CHAR_UUID,
     SOCKET_PATH,
     STATS_CLAUDE_CHAR_UUID,
     STATS_OPENCODE_CHAR_UUID,
+    USAGE_CHAR_UUID,
     decode_message,
 )
 from ohm.provider_types import CanonicalEvent
@@ -197,6 +200,15 @@ def _ipc_to_canonical(msg: IpcMessage | CanonicalIpcMessage) -> CanonicalEvent:
     return adapt_claude_hook(hook, raw_payload=msg.event_data)
 
 
+def _clamp_pct(value: object) -> int:
+    """Coerce a usage percentage to an int in [-1, 100]; garbage -> -1."""
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return -1
+    return max(-1, min(100, n))
+
+
 # ---------------------------------------------------------------------------
 # BLE Daemon
 # ---------------------------------------------------------------------------
@@ -215,6 +227,11 @@ class BleDaemon:
         # Last-pushed stats payload per provider; used to suppress redundant
         # notifications — only push when the JSON actually changed.
         self._last_pushed_stats: dict[str, bytes] = {}
+        # Latest Claude usage quota (session = 5-hour, week = 7-day) as int
+        # percentages; -1 = unknown/absent.  Fed by the statusLine relay.
+        self._usage: dict[str, int] = {"s": -1, "w": -1}
+        # Last-pushed usage payload, for redundant-notification suppression.
+        self._last_pushed_usage: bytes = b""
         # Async queue serializing all BLE notifications with inter-notification
         # spacing to avoid overwhelming the watch BLE stack.
         self._notify_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
@@ -302,6 +319,15 @@ class BleDaemon:
             STATS_OPENCODE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._multi.payload_for("opencode"),
+            GATTAttributePermissions.readable,
+        )
+
+        # USAGE characteristic — Read + Notify (Claude quota bars)
+        await self._server.add_new_characteristic(
+            OHM_SERVICE_UUID,
+            USAGE_CHAR_UUID,
+            GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
+            self._usage_payload(),
             GATTAttributePermissions.readable,
         )
 
@@ -1108,6 +1134,8 @@ class BleDaemon:
             return "STATS_CLAUDE"
         if u == STATS_OPENCODE_CHAR_UUID.upper():
             return "STATS_OPENCODE"
+        if u == USAGE_CHAR_UUID.upper():
+            return "USAGE"
         return uuid[:8]
 
     def _handle_read(
@@ -1134,6 +1162,10 @@ class BleDaemon:
             return val
         if uuid == STATS_OPENCODE_CHAR_UUID.upper():
             val = bytearray(self._multi.payload_for("opencode"))
+            logger.info("GATT read: {} ({} bytes)", name, len(val))
+            return val
+        if uuid == USAGE_CHAR_UUID.upper():
+            val = bytearray(self._usage_payload())
             logger.info("GATT read: {} ({} bytes)", name, len(val))
             return val
         logger.warning("GATT read: unknown char {}", uuid)
@@ -1202,6 +1234,7 @@ class BleDaemon:
         logger.info("Deferred post-subscribe push firing")
         self._notify_history()
         self._push_stats(force=True)
+        self._push_usage(force=True)
 
     # ------------------------------------------------------------------
     # History frame push
@@ -1324,6 +1357,32 @@ class BleDaemon:
         """Push both per-provider STATS characteristics, suppressing identical payloads."""
         self._push_stats_for("claude", force=force)
         self._push_stats_for("opencode", force=force)
+
+    def _usage_payload(self) -> bytes:
+        """Serialise the latest Claude usage quota to compact JSON ({"s":..,"w":..})."""
+        return json.dumps(self._usage, separators=(",", ":")).encode("utf-8")
+
+    def _push_usage(self, force: bool = False) -> None:
+        """Update the USAGE characteristic value and notify, suppressing identical payloads."""
+        if self._server is None or not self._device_connected:
+            return
+        try:
+            payload = self._usage_payload()
+            if len(payload) > MAX_USAGE_LEN:
+                logger.warning(
+                    "Usage payload too large ({} > {} bytes); skipping",
+                    len(payload),
+                    MAX_USAGE_LEN,
+                )
+                return
+            if not force and self._last_pushed_usage == payload:
+                return
+            self._server.get_characteristic(USAGE_CHAR_UUID).value = bytearray(payload)
+            self._enqueue_notify(USAGE_CHAR_UUID)
+            self._last_pushed_usage = payload
+            logger.debug("Usage pushed ({} bytes)", len(payload))
+        except Exception as exc:
+            logger.warning("Failed to update usage: {}", exc)
 
     # ------------------------------------------------------------------
     # Keepalive task — pushes stats AND re-advertises on disconnect
@@ -1464,6 +1523,7 @@ class BleDaemon:
 
                 if is_conn and not self._subscribe_settling and self._has_subscribers:
                     self._push_stats()
+                    self._push_usage()
 
     # ------------------------------------------------------------------
     # IPC message processing (shared by Unix and Windows paths)
@@ -1475,6 +1535,22 @@ class BleDaemon:
         canonical_event_name = (
             msg.canonical_event if isinstance(msg, CanonicalIpcMessage) else msg.event
         )
+
+        # Usage quota (from the Claude statusLine relay) is not a history
+        # event: update the USAGE characteristic and return without touching
+        # the session-state engine or the history frame.  Always intercepted
+        # here (any provider) so "usage" never reaches the canonical-event
+        # validator; only Claude actually carries usage data.
+        if isinstance(msg, CanonicalIpcMessage) and msg.canonical_event == "usage":
+            if provider == "claude":
+                meta = msg.meta or {}
+                self._usage = {
+                    "s": _clamp_pct(meta.get("s", -1)),
+                    "w": _clamp_pct(meta.get("w", -1)),
+                }
+                logger.debug("Usage update: {}", self._usage)
+                self._push_usage()
+            return
 
         # Drop unknown canonical events at the daemon seam. A stale plugin or
         # a future event we haven't taught the pipeline about would otherwise

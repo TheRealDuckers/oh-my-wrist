@@ -173,8 +173,8 @@ class TestNotificationSpacing:
 
         asyncio.run(_run())
 
-        # 1 (initial push_event) + 3 (deferred push: history + 2 stats) = 4
-        assert len(timestamps) == 4
+        # 1 (initial push_event) + 4 (deferred push: history + 2 stats + usage) = 5
+        assert len(timestamps) == 5
         for i in range(1, len(timestamps)):
             delta = timestamps[i] - timestamps[i - 1]
             assert (

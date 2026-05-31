@@ -42,6 +42,7 @@ oh-my-wrist install
 
 This automatically:
 - Patches **Claude Code** hooks in `~/.claude/settings.json`
+- Configures a **Claude Code statusLine** that streams `/usage` quota to the watch (chaining any existing statusLine)
 - Installs the **OpenCode** TypeScript plugin (when `opencode` is on PATH)
 - Registers a background **system service** (systemd / launchd / Task Scheduler)
 
@@ -87,13 +88,20 @@ Start a Claude Code or OpenCode session — the watch updates automatically.
 
 ### Watch Navigation
 
-Three swipeable views (left/right or UP/DOWN on button watches):
+Four swipeable views (left/right or UP/DOWN on button watches). History is the
+initial view — swipe/press **UP** for the Claude usage screen, **DOWN** for the
+per-provider stats screens:
 
-| View | Content |
-|------|---------|
-| History | CLI-style event stack (3 visible rows with animated spinner) |
-| Claude Stats | Session duration, tool calls, files edited, bash count, idle time |
-| OpenCode Stats | Same metrics, isolated from Claude |
+| View | Direction from History | Content |
+|------|------------------------|---------|
+| Claude Usage | UP | `/usage`-style quota bars: session (5h) and week (7d), htop-style |
+| History | — (initial) | CLI-style event stack (3 visible rows with animated spinner) |
+| Claude Stats | DOWN | Session duration, tool calls, files edited, bash count, idle time |
+| OpenCode Stats | DOWN ×2 | Same metrics, isolated from Claude |
+
+The usage screen is Claude-only and shows an empty bar with no percentage
+when quota data is unavailable (API-key users, or before the first API
+response in a session).
 
 ### CLI Commands
 

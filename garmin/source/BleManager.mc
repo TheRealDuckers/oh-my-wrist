@@ -30,6 +30,7 @@ var SESSION_CHAR_UUID         = BLE.stringToUuid("12345678-1234-1234-1234-123456
 var ALERT_CHAR_UUID           = BLE.stringToUuid("12345678-1234-1234-1234-1234567890AE");
 var STATS_CLAUDE_CHAR_UUID    = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B0");
 var STATS_OPENCODE_CHAR_UUID  = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B1");
+var USAGE_CHAR_UUID           = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B2");
 
 // ---------------------------------------------------------------------------
 // Connection state-machine phases and watchdog budgets
@@ -105,6 +106,10 @@ function registerBleProfile() {
             {
                 :uuid        => STATS_OPENCODE_CHAR_UUID,
                 :descriptors => [BLE.cccdUuid()]
+            },
+            {
+                :uuid        => USAGE_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()]
             }
         ]
     };
@@ -161,6 +166,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     var _charAlert;
     var _charStatsClaude;
     var _charStatsOpencode;
+    var _charUsage;
 
     // Connected-device tracking so the app can forcibly drop the link in
     // onStop() via BLE.unpairDevice() — without this the daemon waits 4–10 s
@@ -232,6 +238,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _charAlert = null;
         _charStatsClaude = null;
         _charStatsOpencode = null;
+        _charUsage = null;
         _connectedDevice = null;
         _currentSubscribingUuid = null;
         _retriedCccds = {};
@@ -423,6 +430,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _charAlert = null;
         _charStatsClaude = null;
         _charStatsOpencode = null;
+        _charUsage = null;
         _subscribeQueue = [];
         _discoveryAttempts = 0;
         _currentSubscribingUuid = null;
@@ -957,7 +965,8 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             HISTORY_CHAR_UUID,
             ALERT_CHAR_UUID,
             STATS_CLAUDE_CHAR_UUID,
-            STATS_OPENCODE_CHAR_UUID
+            STATS_OPENCODE_CHAR_UUID,
+            USAGE_CHAR_UUID
         ];
         _setPhase(PHASE_SUBSCRIBING);
         _subscribeNext();
@@ -985,6 +994,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 else if (charUuid.equals(ALERT_CHAR_UUID)) { _charAlert = ch; }
                 else if (charUuid.equals(STATS_CLAUDE_CHAR_UUID)) { _charStatsClaude = ch; }
                 else if (charUuid.equals(STATS_OPENCODE_CHAR_UUID)) { _charStatsOpencode = ch; }
+                else if (charUuid.equals(USAGE_CHAR_UUID)) { _charUsage = ch; }
             }
         } catch (e) {
             // Service/characteristic invalidated (device disconnecting).
@@ -1030,6 +1040,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _charAlert = null;
         _charStatsClaude = null;
         _charStatsOpencode = null;
+        _charUsage = null;
         _discoveryDevice = null;
         _connectedDevice = null;
         _currentSubscribingUuid = null;
@@ -1185,6 +1196,12 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             var so = _decodeUtf8(value);
             if (so != null) {
                 StatsModel.opencode.parsePayload(so);
+                WatchUi.requestUpdate();
+            }
+        } else if (characteristic == _charUsage) {
+            var su = _decodeUtf8(value);
+            if (su != null) {
+                UsageModel.parsePayload(su);
                 WatchUi.requestUpdate();
             }
         } else if (characteristic == _charHistory) {

@@ -278,6 +278,7 @@ def main() -> int:
         )
 
     print(f"\n  {len(STATIC_GLYPHS) + len(SPINNER_GLYPHS)} bitmaps generated.")
+
     return 0
 
 

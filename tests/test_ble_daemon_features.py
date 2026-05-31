@@ -256,7 +256,7 @@ class TestHandleUnixClientFeatures:
         writer.close = MagicMock()
 
         with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.ensure_future"
+            "asyncio.ensure_future", side_effect=lambda coro: coro.close()
         ) as mock_future:
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
@@ -310,7 +310,7 @@ class TestHandleUnixClientFeatures:
         writer.close = MagicMock()
 
         with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.ensure_future"
+            "asyncio.ensure_future", side_effect=lambda coro: coro.close()
         ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
@@ -398,6 +398,7 @@ class TestPeriodicStatsTask:
                 call_count[0] += 1
                 if call_count[0] == 1:
                     # Simulate timeout on first call → triggers _push_stats
+                    coro.close()
                     raise asyncio.TimeoutError()
                 # On second call: set the stop event so the loop exits
                 real_stop.set()
@@ -436,6 +437,7 @@ def _run_one_keepalive_tick(daemon, max_ticks: int = 1):
             timeouts.append(timeout)
             if ticks_done[0] < max_ticks:
                 ticks_done[0] += 1
+                coro.close()
                 raise asyncio.TimeoutError()
             real_stop.set()
             return await coro

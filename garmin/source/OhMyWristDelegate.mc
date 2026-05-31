@@ -1,11 +1,12 @@
 // OhMyWristDelegate.mc — View navigation delegate
 //
 // Handles swipe gestures (touchscreen watches) and UP/DOWN button presses
-// (button-only watches) to switch between three widget views:
+// (button-only watches) to switch between four widget views:
 //
-//   View 0: OhMyWristView      — live status + connection dot
-//   View 1: OhMyWristStatsView — Claude session statistics
-//   View 2: OhMyWristStatsView — OpenCode session statistics
+//   View 0: OhMyWristUsageView — Claude usage quota bars (UP from history)
+//   View 1: OhMyWristView      — live status + connection dot (initial)
+//   View 2: OhMyWristStatsView — Claude session statistics
+//   View 3: OhMyWristStatsView — OpenCode session statistics
 //
 // The delegate is constructed with `viewIndex` so it can no-op at the
 // boundaries instead of re-pushing the same view (which Connect IQ would
@@ -24,7 +25,7 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
 
     // Swipe left / DOWN button — advance to the next view.
     function onNextPage() {
-        if (_viewIndex >= 2) {
+        if (_viewIndex >= 3) {
             return true;  // already on the last view; no transition
         }
         var nextIndex = _viewIndex + 1;
@@ -51,13 +52,16 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function _makeView(index) {
-        if (index == 1) {
+        if (index == 0) {
+            return new OhMyWristUsageView();
+        }
+        if (index == 2) {
             return new OhMyWristStatsView(
                 StatsModel.claude,
                 WatchUi.loadResource(Rez.Strings.StatsHeaderClaude)
             );
         }
-        if (index == 2) {
+        if (index == 3) {
             return new OhMyWristStatsView(
                 StatsModel.opencode,
                 WatchUi.loadResource(Rez.Strings.StatsHeaderOpenCode)
