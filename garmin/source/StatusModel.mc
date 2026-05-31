@@ -13,7 +13,6 @@ using Toybox.Timer;
 using Toybox.WatchUi;
 
 module StatusModel {
-
     // ------------------------------------------------------------------
     // History buffer (cap WATCH_HISTORY_MAX)
     // ------------------------------------------------------------------
@@ -21,7 +20,7 @@ module StatusModel {
     const WATCH_HISTORY_MAX = 10;
 
     var entries as Lang.Array<Lang.Dictionary> = []; // [{ :icon, :flags, :text, :ts }, ...]
-    var isConnected    = false;
+    var isConnected = false;
     var lastUpdateTime = null;
 
     // Coarse phase of the BLE state machine, surfaced through getStatusKey()
@@ -46,25 +45,25 @@ module StatusModel {
     const SPINNER_INTERVAL_MS = 150;
 
     // Glyph bitmap indices — used by IconCatalog.glyphBitmapIndex().
-    const GLYPH_PLUS_GREEN     = 0;
-    const GLYPH_MINUS_WHITE    = 1;
-    const GLYPH_TILDE_CHROME   = 2;
-    const GLYPH_BANG_AMBER     = 3;
+    const GLYPH_PLUS_GREEN = 0;
+    const GLYPH_MINUS_WHITE = 1;
+    const GLYPH_TILDE_CHROME = 2;
+    const GLYPH_BANG_AMBER = 3;
     const GLYPH_QUESTION_AMBER = 4;
-    const GLYPH_X_CHROME       = 5;
-    const GLYPH_X_AMBER        = 6;
-    const GLYPH_DOT_WHITE      = 7;
+    const GLYPH_X_CHROME = 5;
+    const GLYPH_X_AMBER = 6;
+    const GLYPH_DOT_WHITE = 7;
 
-    var spinnerFrame   = 0;
-    var spinnerTimer   = null;
+    var spinnerFrame = 0;
+    var spinnerTimer = null;
     var spinnerBitmaps as Lang.Array<WatchUi.BitmapResource>? = null;
-    var glyphBitmaps   as Lang.Array<WatchUi.BitmapResource>? = null;
+    var glyphBitmaps as Lang.Array<WatchUi.BitmapResource>? = null;
 
     // Blinking block cursor for the newest row.  Toggled every 3 shared
     // spinner-timer ticks (≈ 450 ms on/off) so we only use one timer.
     const CURSOR_BLINK_TICKS = 3;
-    var cursorVisible  = true;
-    var cursorTicks    = 0;
+    var cursorVisible = true;
+    var cursorTicks = 0;
 
     // ------------------------------------------------------------------
     // Lifecycle
@@ -96,19 +95,19 @@ module StatusModel {
                 WatchUi.loadResource(Rez.Drawables.Spinner3),
                 WatchUi.loadResource(Rez.Drawables.Spinner4),
                 WatchUi.loadResource(Rez.Drawables.Spinner5),
-                WatchUi.loadResource(Rez.Drawables.Spinner6)
+                WatchUi.loadResource(Rez.Drawables.Spinner6),
             ];
         }
         if (glyphBitmaps == null) {
             glyphBitmaps = [
-                WatchUi.loadResource(Rez.Drawables.GlyphPlusGreen),      // 0
-                WatchUi.loadResource(Rez.Drawables.GlyphMinusWhite),     // 1
-                WatchUi.loadResource(Rez.Drawables.GlyphTildeChrome),    // 2
-                WatchUi.loadResource(Rez.Drawables.GlyphBangAmber),      // 3
-                WatchUi.loadResource(Rez.Drawables.GlyphQuestionAmber),  // 4
-                WatchUi.loadResource(Rez.Drawables.GlyphXChrome),        // 5
-                WatchUi.loadResource(Rez.Drawables.GlyphXAmber),         // 6
-                WatchUi.loadResource(Rez.Drawables.GlyphDotWhite)        // 7
+                WatchUi.loadResource(Rez.Drawables.GlyphPlusGreen), // 0
+                WatchUi.loadResource(Rez.Drawables.GlyphMinusWhite), // 1
+                WatchUi.loadResource(Rez.Drawables.GlyphTildeChrome), // 2
+                WatchUi.loadResource(Rez.Drawables.GlyphBangAmber), // 3
+                WatchUi.loadResource(Rez.Drawables.GlyphQuestionAmber), // 4
+                WatchUi.loadResource(Rez.Drawables.GlyphXChrome), // 5
+                WatchUi.loadResource(Rez.Drawables.GlyphXAmber), // 6
+                WatchUi.loadResource(Rez.Drawables.GlyphDotWhite), // 7
             ];
         }
     }
@@ -134,19 +133,28 @@ module StatusModel {
     // `[+]` (or `[~]`/`[x]`/`[!]`) in place.  If no in-flight entry is
     // found (out-of-order events), we fall through and append normally.
     function appendEvent(frame) {
-        if (frame == null) { return; }
+        if (frame == null) {
+            return;
+        }
         var inFlags = frame.get(:flags);
-        if (inFlags == null) { inFlags = 0; }
+        if (inFlags == null) {
+            inFlags = 0;
+        }
 
         if ((inFlags & HistoryDecoder.FLAG_CLEAR_PREV_SPINNER) != 0) {
             for (var i = entries.size() - 1; i >= 0; i--) {
                 var f = entries[i].get(:flags) as Lang.Number?;
-                if (f != null && ((f as Lang.Number) & HistoryDecoder.FLAG_SPINNER) != 0) {
+                if (
+                    f != null &&
+                    ((f as Lang.Number) & HistoryDecoder.FLAG_SPINNER) != 0
+                ) {
                     // Merge the incoming flags (e.g. ACCENT for session_error)
                     // into the matched entry, clear SPINNER, drop the directive.
-                    var merged = ((f as Lang.Number) & ~HistoryDecoder.FLAG_SPINNER)
-                                | (inFlags & ~HistoryDecoder.FLAG_SPINNER
-                                           & ~HistoryDecoder.FLAG_CLEAR_PREV_SPINNER);
+                    var merged =
+                        ((f as Lang.Number) & ~HistoryDecoder.FLAG_SPINNER) |
+                        (inFlags &
+                            ~HistoryDecoder.FLAG_SPINNER &
+                            ~HistoryDecoder.FLAG_CLEAR_PREV_SPINNER);
                     entries[i].put(:flags, merged);
                     entries[i].put(:statusIcon, frame.get(:icon));
                     entries[i].put(:ts, Time.now());
@@ -182,30 +190,30 @@ module StatusModel {
         // while the body reads as the operation that just completed.
         var inIcon = frame.get(:icon);
         var inText = frame.get(:text);
-        var hasText = (inText != null && (inText as Lang.String).length() > 0);
+        var hasText = inText != null && (inText as Lang.String).length() > 0;
 
-        var useIcon       = inIcon;
+        var useIcon = inIcon;
         var useStatusIcon = null;
-        var useText       = (inText != null) ? inText : "";
+        var useText = inText != null ? inText : "";
 
         if (!hasText && entries.size() > 0) {
             for (var j = entries.size() - 1; j >= 0; j--) {
                 var prevText = entries[j].get(:text) as Lang.String?;
                 if (prevText != null && prevText.length() > 0) {
-                    useIcon       = entries[j].get(:icon);
-                    useStatusIcon = inIcon;   // incoming icon drives the glyph
-                    useText       = prevText;
+                    useIcon = entries[j].get(:icon);
+                    useStatusIcon = inIcon; // incoming icon drives the glyph
+                    useText = prevText;
                     break;
                 }
             }
         }
 
         entries.add({
-            :icon       => useIcon,
+            :icon => useIcon,
             :statusIcon => useStatusIcon,
-            :flags      => storedFlags,
-            :text       => useText,
-            :ts         => Time.now()
+            :flags => storedFlags,
+            :text => useText,
+            :ts => Time.now(),
         });
         while (entries.size() > WATCH_HISTORY_MAX) {
             entries = entries.slice(1, null);
@@ -252,7 +260,10 @@ module StatusModel {
     function hasSpinner() {
         for (var i = 0; i < entries.size(); i++) {
             var f = entries[i].get(:flags) as Lang.Number?;
-            if (f != null && ((f as Lang.Number) & HistoryDecoder.FLAG_SPINNER) != 0) {
+            if (
+                f != null &&
+                ((f as Lang.Number) & HistoryDecoder.FLAG_SPINNER) != 0
+            ) {
                 return true;
             }
         }
@@ -262,7 +273,11 @@ module StatusModel {
     function _ensureSpinnerTimer() {
         if (spinnerTimer == null) {
             spinnerTimer = new Timer.Timer();
-            spinnerTimer.start(new Lang.Method(StatusModel, :_tickSpinner), SPINNER_INTERVAL_MS, true);
+            spinnerTimer.start(
+                new Lang.Method(StatusModel, :_tickSpinner),
+                SPINNER_INTERVAL_MS,
+                true
+            );
         }
     }
 
@@ -293,7 +308,9 @@ module StatusModel {
     // Returns the bitmap resource for the current spinner frame, or null
     // if bitmaps failed to load (e.g. on a stripped-down device).
     function currentSpinnerBitmap() {
-        if (spinnerBitmaps == null) { return null; }
+        if (spinnerBitmaps == null) {
+            return null;
+        }
         return spinnerBitmaps[spinnerFrame];
     }
 
@@ -301,8 +318,12 @@ module StatusModel {
     // GLYPH_PLUS_GREEN … GLYPH_DOT_WHITE constants), or null if
     // bitmaps failed to load.
     function glyphBitmap(index) {
-        if (glyphBitmaps == null) { return null; }
-        if (index < 0 || index >= glyphBitmaps.size()) { return null; }
+        if (glyphBitmaps == null) {
+            return null;
+        }
+        if (index < 0 || index >= glyphBitmaps.size()) {
+            return null;
+        }
         return glyphBitmaps[index];
     }
 
@@ -338,8 +359,12 @@ module StatusModel {
     // "offline") so the user can see the watch is actively trying.  When
     // connected, returns "ok" (< 30 s since last update) or "stale".
     function getStatusKey() {
-        if (!isConnected) { return connectionPhase; }
-        if (lastUpdateTime == null) { return "stale"; }
+        if (!isConnected) {
+            return connectionPhase;
+        }
+        if (lastUpdateTime == null) {
+            return "stale";
+        }
         var delta = Time.now().subtract(lastUpdateTime).value();
         return delta < 30 ? "ok" : "stale";
     }

@@ -204,9 +204,9 @@ class TestEncodeEvent:
             frame = encode_event(
                 _ev(ce, tool_name="Bash", label="x" * 100, path="/x" * 50)
             )
-            assert (
-                len(frame) <= MAX_FRAME_LEN
-            ), f"{ce}: frame {len(frame)} > {MAX_FRAME_LEN}"
+            assert len(frame) <= MAX_FRAME_LEN, (
+                f"{ce}: frame {len(frame)} > {MAX_FRAME_LEN}"
+            )
 
     def test_long_label_truncated_to_entry_text_max(self):
         frame = encode_event(

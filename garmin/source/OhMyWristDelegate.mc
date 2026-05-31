@@ -15,7 +15,6 @@
 using Toybox.WatchUi;
 
 class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
-
     var _viewIndex;
 
     function initialize(viewIndex) {
@@ -26,7 +25,7 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
     // Swipe left / DOWN button — advance to the next view.
     function onNextPage() {
         if (_viewIndex >= 3) {
-            return true;  // already on the last view; no transition
+            return true; // already on the last view; no transition
         }
         var nextIndex = _viewIndex + 1;
         WatchUi.switchToView(
@@ -40,7 +39,7 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
     // Swipe right / UP button — return to the previous view.
     function onPreviousPage() {
         if (_viewIndex <= 0) {
-            return true;  // already on the first view; no transition
+            return true; // already on the first view; no transition
         }
         var prevIndex = _viewIndex - 1;
         WatchUi.switchToView(

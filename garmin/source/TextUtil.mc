@@ -10,7 +10,6 @@ using Toybox.Math;
 using Toybox.System;
 
 module TextUtil {
-
     // ─── Round-screen geometry ─────────────────────────────────────────
     //
     // On a round display the usable horizontal width at any Y position is
@@ -37,8 +36,12 @@ module TextUtil {
         // radius = w / 2.  Compute distance from center.
         var r = w / 2.0;
         var dy = y - r;
-        if (dy < 0) { dy = -dy; }   // abs
-        if (dy >= r) { return 0; }
+        if (dy < 0) {
+            dy = -dy;
+        } // abs
+        if (dy >= r) {
+            return 0;
+        }
         return (2.0 * Math.sqrt(r * r - dy * dy)).toNumber();
     }
 
@@ -56,26 +59,39 @@ module TextUtil {
     //   shape       — screenShape from DeviceSettings
     //   margin      — fraction of chord to use (0.90 = leave 10% padding)
     //
-    function findFitY(preferredY, limitY, stepPx, textWidthPx, w, h, shape, margin) {
+    function findFitY(
+        preferredY,
+        limitY,
+        stepPx,
+        textWidthPx,
+        w,
+        h,
+        shape,
+        margin
+    ) {
         var y = preferredY;
-        var movingDown = (limitY > preferredY);  // header moves down, footer moves up
+        var movingDown = limitY > preferredY; // header moves down, footer moves up
 
         while (true) {
             var chord = getChordWidth(w, h, y, shape);
             var avail = (chord * margin).toNumber();
             if (textWidthPx <= avail) {
-                return y;   // text fits at this Y
+                return y; // text fits at this Y
             }
             // Step toward center
             if (movingDown) {
                 y = y + stepPx;
-                if (y >= limitY) { return limitY; }
+                if (y >= limitY) {
+                    return limitY;
+                }
             } else {
                 y = y - stepPx;
-                if (y <= limitY) { return limitY; }
+                if (y <= limitY) {
+                    return limitY;
+                }
             }
         }
-        return limitY;  // unreachable, but satisfies compiler
+        return limitY; // unreachable, but satisfies compiler
     }
 
     // Ellipsis glyph reused by middleTruncate.  Single character so it
@@ -90,20 +106,30 @@ module TextUtil {
     // The suffix is preserved for filenames (extension stays visible).
     // Returns `str` unchanged when short enough.
     function middleTruncate(str, maxChars) {
-        if (str == null) { return ""; }
+        if (str == null) {
+            return "";
+        }
         var s = str as Lang.String;
         var n = s.length();
-        if (maxChars <= 0) { return ""; }
-        if (n <= maxChars) { return s; }
-        if (maxChars <= 1) { return ELLIPSIS; }
+        if (maxChars <= 0) {
+            return "";
+        }
+        if (n <= maxChars) {
+            return s;
+        }
+        if (maxChars <= 1) {
+            return ELLIPSIS;
+        }
 
-        var keep = maxChars - 1;         // one slot for the ellipsis
-        var head = (keep + 1) / 2;       // bias prefix to be at least as long as suffix
+        var keep = maxChars - 1; // one slot for the ellipsis
+        var head = (keep + 1) / 2; // bias prefix to be at least as long as suffix
         var tail = keep - head;
-        if (tail < 0) { tail = 0; }
+        if (tail < 0) {
+            tail = 0;
+        }
 
         var prefix = s.substring(0, head);
-        var suffix = (tail > 0) ? s.substring(n - tail, n) : "";
+        var suffix = tail > 0 ? s.substring(n - tail, n) : "";
         return prefix + ELLIPSIS + suffix;
     }
 
@@ -118,18 +144,25 @@ module TextUtil {
     // Falls back to `str` unchanged when it already fits, and to the
     // bare ellipsis when even one character + ellipsis exceeds maxPx.
     function fitMiddleTruncate(dc, str, font, maxPx) {
-        if (str == null) { return ""; }
+        if (str == null) {
+            return "";
+        }
         var s = str as Lang.String;
-        if (dc.getTextWidthInPixels(s, font) <= maxPx) { return s; }
+        if (dc.getTextWidthInPixels(s, font) <= maxPx) {
+            return s;
+        }
         var n = s.length();
-        if (n <= 2) { return ELLIPSIS; }
+        if (n <= 2) {
+            return ELLIPSIS;
+        }
 
         // Shrink one char at a time from the longest candidate down.
         // O(n) measurements; cheap for typical 18-char labels.
         for (var keep = n - 1; keep >= 2; keep--) {
             var head = (keep + 1) / 2;
             var tail = keep - head;
-            var candidate = s.substring(0, head) + ELLIPSIS + s.substring(n - tail, n);
+            var candidate =
+                s.substring(0, head) + ELLIPSIS + s.substring(n - tail, n);
             if (dc.getTextWidthInPixels(candidate, font) <= maxPx) {
                 return candidate;
             }

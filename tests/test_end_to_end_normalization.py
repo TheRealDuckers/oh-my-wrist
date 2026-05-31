@@ -61,9 +61,9 @@ def _oc_raw(provider_event: str, **kwargs) -> dict:
 
 def _decode(ev) -> dict:
     frame = encode_event(ev)
-    assert (
-        len(frame) <= MAX_FRAME_LEN
-    ), f"Frame too long: {len(frame)} bytes for {ev.canonical_event}"
+    assert len(frame) <= MAX_FRAME_LEN, (
+        f"Frame too long: {len(frame)} bytes for {ev.canonical_event}"
+    )
     decoded = decode_frame(frame)
     assert decoded is not None
     return decoded
@@ -308,9 +308,9 @@ class TestClaudeSessionSimulation:
         hook = HookEvent.model_validate(raw)
         canonical = adapt_claude_hook(hook, raw_payload=raw)
         decoded = _decode(canonical)
-        assert decoded["icon"] == int(
-            expected_icon
-        ), f"[{desc}] expected icon {expected_icon!r}, got {decoded['icon']:#x}"
+        assert decoded["icon"] == int(expected_icon), (
+            f"[{desc}] expected icon {expected_icon!r}, got {decoded['icon']:#x}"
+        )
 
     def test_session_state_after_full_session(self):
         s = SessionState()
@@ -408,9 +408,9 @@ class TestOpenCodeSessionSimulation:
             pytest.skip(f"[{desc}] Event suppressed by noise control")
         decoded = _decode(canonical)
         if expected_icon is not None:
-            assert decoded["icon"] == int(
-                expected_icon
-            ), f"[{desc}] expected icon {expected_icon!r}, got {decoded['icon']:#x}"
+            assert decoded["icon"] == int(expected_icon), (
+                f"[{desc}] expected icon {expected_icon!r}, got {decoded['icon']:#x}"
+            )
 
     def test_session_state_after_full_opencode_session(self):
         s = SessionState()

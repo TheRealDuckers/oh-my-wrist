@@ -24,13 +24,21 @@ using Toybox.WatchUi;
 // UUID constants — must match protocol.py
 // ---------------------------------------------------------------------------
 
-var OHM_SERVICE_UUID       = BLE.stringToUuid("12345678-1234-1234-1234-1234567890AB");
-var HISTORY_CHAR_UUID         = BLE.stringToUuid("12345678-1234-1234-1234-1234567890AC");
-var SESSION_CHAR_UUID         = BLE.stringToUuid("12345678-1234-1234-1234-1234567890AD");
-var ALERT_CHAR_UUID           = BLE.stringToUuid("12345678-1234-1234-1234-1234567890AE");
-var STATS_CLAUDE_CHAR_UUID    = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B0");
-var STATS_OPENCODE_CHAR_UUID  = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B1");
-var USAGE_CHAR_UUID           = BLE.stringToUuid("12345678-1234-1234-1234-1234567890B2");
+var OHM_SERVICE_UUID = BLE.stringToUuid("0FA155B0-0C21-723A-970C-9821F1C5FFAB");
+var HISTORY_CHAR_UUID = BLE.stringToUuid(
+    "0FA155B1-0C21-723A-970C-9821F1C5FFAB"
+);
+var SESSION_CHAR_UUID = BLE.stringToUuid(
+    "0FA155B2-0C21-723A-970C-9821F1C5FFAB"
+);
+var ALERT_CHAR_UUID = BLE.stringToUuid("0FA155B3-0C21-723A-970C-9821F1C5FFAB");
+var STATS_CLAUDE_CHAR_UUID = BLE.stringToUuid(
+    "0FA155B4-0C21-723A-970C-9821F1C5FFAB"
+);
+var STATS_OPENCODE_CHAR_UUID = BLE.stringToUuid(
+    "0FA155B5-0C21-723A-970C-9821F1C5FFAB"
+);
+var USAGE_CHAR_UUID = BLE.stringToUuid("0FA155B6-0C21-723A-970C-9821F1C5FFAB");
 
 // ---------------------------------------------------------------------------
 // Connection state-machine phases and watchdog budgets
@@ -42,38 +50,48 @@ var USAGE_CHAR_UUID           = BLE.stringToUuid("12345678-1234-1234-1234-123456
 // drops the link when a phase overshoots its budget.
 // ---------------------------------------------------------------------------
 
-const PHASE_SCANNING     = 0;
-const PHASE_CONNECTING   = 1;
-const PHASE_DISCOVERING  = 2;
-const PHASE_SUBSCRIBING  = 3;
-const PHASE_READY        = 4;
+const PHASE_SCANNING = 0;
+const PHASE_CONNECTING = 1;
+const PHASE_DISCOVERING = 2;
+const PHASE_SUBSCRIBING = 3;
+const PHASE_READY = 4;
 
-const WATCHDOG_TICK_MS          = 2000;
-const SCAN_REASSERT_MS          = 15000;
-const CONNECT_TIMEOUT_MS        = 30000;
-const DISCOVERY_ATTEMPT_MAX     = 12;
-const DISCOVERY_ATTEMPT_DELAY   = 500;
-const DISCOVERY_TIMEOUT_MS      = 8000;
+const WATCHDOG_TICK_MS = 2000;
+const SCAN_REASSERT_MS = 15000;
+const CONNECT_TIMEOUT_MS = 30000;
+const DISCOVERY_ATTEMPT_MAX = 12;
+const DISCOVERY_ATTEMPT_DELAY = 500;
+const DISCOVERY_TIMEOUT_MS = 8000;
 const SUBSCRIBE_STEP_TIMEOUT_MS = 5000;
-const BLACKLIST_TTL_MS          = 10000;
+const BLACKLIST_TTL_MS = 10000;
 
 // Two-phase scan: collect matching adverts for this duration before
 // picking the best one (strongest RSSI) and pairing.  Avoids latching
 // onto the first (potentially stale/weak) advertisement when a
 // stronger one arrives a few hundred milliseconds later.
-const SCAN_COLLECT_MS           = 1500;
+const SCAN_COLLECT_MS = 1500;
 
 // Delay between tearing a link down and the next BLE op (setScanState etc.).
 // Back-to-back BLE ops can cause workarea errors; spacing via a short timer
 // gives the stack time to drain state after pairDevice / unpairDevice.
-const BLE_OP_SPACING_MS         = 1000;
+const BLE_OP_SPACING_MS = 1000;
 
 function _phaseName(phase) {
-    if (phase == PHASE_SCANNING)    { return "scanning"; }
-    if (phase == PHASE_CONNECTING)  { return "connecting"; }
-    if (phase == PHASE_DISCOVERING) { return "discovering"; }
-    if (phase == PHASE_SUBSCRIBING) { return "subscribing"; }
-    if (phase == PHASE_READY)       { return "ready"; }
+    if (phase == PHASE_SCANNING) {
+        return "scanning";
+    }
+    if (phase == PHASE_CONNECTING) {
+        return "connecting";
+    }
+    if (phase == PHASE_DISCOVERING) {
+        return "discovering";
+    }
+    if (phase == PHASE_SUBSCRIBING) {
+        return "subscribing";
+    }
+    if (phase == PHASE_READY) {
+        return "ready";
+    }
     return "offline";
 }
 
@@ -88,30 +106,30 @@ function registerBleProfile() {
         :uuid => OHM_SERVICE_UUID,
         :characteristics => [
             {
-                :uuid        => HISTORY_CHAR_UUID,
-                :descriptors => [BLE.cccdUuid()]
+                :uuid => HISTORY_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()],
             },
             {
-                :uuid        => SESSION_CHAR_UUID,
-                :descriptors => []
+                :uuid => SESSION_CHAR_UUID,
+                :descriptors => [],
             },
             {
-                :uuid        => ALERT_CHAR_UUID,
-                :descriptors => [BLE.cccdUuid()]
+                :uuid => ALERT_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()],
             },
             {
-                :uuid        => STATS_CLAUDE_CHAR_UUID,
-                :descriptors => [BLE.cccdUuid()]
+                :uuid => STATS_CLAUDE_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()],
             },
             {
-                :uuid        => STATS_OPENCODE_CHAR_UUID,
-                :descriptors => [BLE.cccdUuid()]
+                :uuid => STATS_OPENCODE_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()],
             },
             {
-                :uuid        => USAGE_CHAR_UUID,
-                :descriptors => [BLE.cccdUuid()]
-            }
-        ]
+                :uuid => USAGE_CHAR_UUID,
+                :descriptors => [BLE.cccdUuid()],
+            },
+        ],
     };
     BLE.registerProfile(profile);
 }
@@ -140,7 +158,6 @@ function deviceAdvertisesOhmService(result) {
 // ---------------------------------------------------------------------------
 
 class OhMyWristBleDelegate extends BLE.BleDelegate {
-
     // Single pre-allocated one-shot timer for all phase-specific operations
     // (boot scan, scan collect, discovery retry, reconnect, abort safety net,
     // disconnect-deferred handling).  These use cases are mutually exclusive
@@ -187,10 +204,10 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // phases and watchdog budgets".
     // ------------------------------------------------------------------
 
-    var _phase;                    // PHASE_* constant
-    var _phaseStartTime;           // System.getTimer() ms when phase was set
-    var _watchdogTimer;            // shared Timer driving _onWatchdogTick
-    var _currentSubscribeStartTime;// per-step start for PHASE_SUBSCRIBING
+    var _phase; // PHASE_* constant
+    var _phaseStartTime; // System.getTimer() ms when phase was set
+    var _watchdogTimer; // shared Timer driving _onWatchdogTick
+    var _currentSubscribeStartTime; // per-step start for PHASE_SUBSCRIBING
 
     // ScanResult of the device we last asked pairDevice() about, captured
     // before the call returns so the watchdog can blacklist it if the
@@ -293,7 +310,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // ------------------------------------------------------------------
 
     function _setPhase(phase) {
-        if (_phase == phase) { return; }
+        if (_phase == phase) {
+            return;
+        }
         _phase = phase;
         _phaseStartTime = System.getTimer();
         StatusModel.setPhase(_phaseName(phase));
@@ -304,7 +323,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     }
 
     function _startWatchdog() {
-        if (_watchdogTimer != null) { return; }
+        if (_watchdogTimer != null) {
+            return;
+        }
         _watchdogTimer = new Timer.Timer();
         _watchdogTimer.start(method(:_onWatchdogTick), WATCHDOG_TICK_MS, true);
     }
@@ -326,12 +347,16 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
 
         // Heartbeat: only log non-ready phases (for timeout diagnostics).
         if (_phase != PHASE_READY) {
-            System.println("BLE: tick phase=" + _phaseName(_phase) + " elapsed=" + elapsed);
+            System.println(
+                "BLE: tick phase=" + _phaseName(_phase) + " elapsed=" + elapsed
+            );
         }
 
         if (_phase == PHASE_SCANNING) {
             if (elapsed > SCAN_REASSERT_MS) {
-                System.println("BLE: scan watchdog re-asserting SCAN_STATE_SCANNING");
+                System.println(
+                    "BLE: scan watchdog re-asserting SCAN_STATE_SCANNING"
+                );
                 try {
                     BLE.setScanState(BLE.SCAN_STATE_SCANNING);
                 } catch (e) {
@@ -339,26 +364,29 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 }
                 _phaseStartTime = now;
             }
-
         } else if (_phase == PHASE_CONNECTING) {
             if (elapsed > CONNECT_TIMEOUT_MS) {
-                System.println("BLE: connect watchdog timed out — blacklisting + rescanning");
+                System.println(
+                    "BLE: connect watchdog timed out — blacklisting + rescanning"
+                );
                 _blacklistPending(now);
                 _abortToScanning();
             }
-
         } else if (_phase == PHASE_DISCOVERING) {
             if (elapsed > DISCOVERY_TIMEOUT_MS) {
-                System.println("BLE: discovery watchdog timed out — blacklisting + rescanning");
+                System.println(
+                    "BLE: discovery watchdog timed out — blacklisting + rescanning"
+                );
                 _blacklistPending(now);
                 _abortToScanning();
             }
-
         } else if (_phase == PHASE_SUBSCRIBING) {
             if (_currentSubscribeStartTime != null) {
                 var sub = now - _currentSubscribeStartTime;
                 if (sub > SUBSCRIBE_STEP_TIMEOUT_MS) {
-                    System.println("BLE: subscribe-step watchdog timed out — dropping link");
+                    System.println(
+                        "BLE: subscribe-step watchdog timed out — dropping link"
+                    );
                     _abortToScanning();
                 }
             }
@@ -370,7 +398,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // ------------------------------------------------------------------
 
     function _isBlacklisted(scanResult, now) {
-        if (scanResult == null) { return false; }
+        if (scanResult == null) {
+            return false;
+        }
         for (var i = _blacklist.size() - 1; i >= 0; i--) {
             var entry = _blacklist[i];
             if (entry[:expiry] <= now) {
@@ -391,9 +421,16 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     }
 
     function _blacklistPending(now) {
-        if (_pendingScanResult == null) { return; }
-        _blacklist.add({:result => _pendingScanResult, :expiry => now + BLACKLIST_TTL_MS});
-        System.println("BLE: blacklisted device for " + BLACKLIST_TTL_MS + "ms");
+        if (_pendingScanResult == null) {
+            return;
+        }
+        _blacklist.add({
+            :result => _pendingScanResult,
+            :expiry => now + BLACKLIST_TTL_MS,
+        });
+        System.println(
+            "BLE: blacklisted device for " + BLACKLIST_TTL_MS + "ms"
+        );
         _pendingScanResult = null;
     }
 
@@ -416,12 +453,24 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
 
     function _abortToScanningExtended(isHardwareException as Lang.Boolean) {
         if (_aborting) {
-            System.println("BLE: _abortToScanning re-entrancy blocked (_aborting=true, phase=" + _phaseName(_phase) + ")");
+            System.println(
+                "BLE: _abortToScanning re-entrancy blocked (_aborting=true, phase=" +
+                    _phaseName(_phase) +
+                    ")"
+            );
             return;
         }
         _aborting = true;
         var wasPhase = _phase;
-        System.println("BLE: _abortToScanning entered (phase=" + _phaseName(_phase) + ", hasDevice=" + (_connectedDevice != null) + ", hwEx=" + isHardwareException + ")");
+        System.println(
+            "BLE: _abortToScanning entered (phase=" +
+                _phaseName(_phase) +
+                ", hasDevice=" +
+                (_connectedDevice != null) +
+                ", hwEx=" +
+                isHardwareException +
+                ")"
+        );
 
         _opTimer.stop();
         _scanCollected = [];
@@ -450,7 +499,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             // onConnectedStateChanged), it will take priority and we cancel
             // the deferred unpair.
             if (wasPhase == PHASE_CONNECTING) {
-                System.println("BLE: _abortToScanning (never got CONNECTED callback)");
+                System.println(
+                    "BLE: _abortToScanning (never got CONNECTED callback)"
+                );
                 // The OS BLE stack still holds a pending connection. If we
                 // don't free it, the OS filters out advertisements from that
                 // device, making it invisible to scans — permanently stuck.
@@ -465,19 +516,28 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 StatusModel.setConnected(false);
                 _setPhase(PHASE_SCANNING);
                 _opTimer.stop();
-                _opTimer.start(method(:_onDeferredUnpairAndRescan), BLE_OP_SPACING_MS, false);
+                _opTimer.start(
+                    method(:_onDeferredUnpairAndRescan),
+                    BLE_OP_SPACING_MS,
+                    false
+                );
                 _aborting = false;
                 return;
             }
 
-            System.println("BLE: _abortToScanning calling unpairDevice, expecting DISCONNECTED callback");
+            System.println(
+                "BLE: _abortToScanning calling unpairDevice, expecting DISCONNECTED callback"
+            );
             try {
                 BLE.unpairDevice(_connectedDevice);
                 // Safety net: if DISCONNECTED callback never fires, force-reset
                 // after a bounded timeout to prevent permanent stuck state.
                 _scheduleAbortSafetyNet(isHardwareException);
             } catch (e) {
-                System.println("BLE: unpairDevice threw in _abortToScanning: " + e.getErrorMessage());
+                System.println(
+                    "BLE: unpairDevice threw in _abortToScanning: " +
+                        e.getErrorMessage()
+                );
                 _connectedDevice = null;
                 _discoveryDevice = null;
                 StatusModel.setConnected(false);
@@ -488,7 +548,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             return;
         }
 
-        System.println("BLE: _abortToScanning no device, going straight to scan");
+        System.println(
+            "BLE: _abortToScanning no device, going straight to scan"
+        );
         _discoveryDevice = null;
         StatusModel.setConnected(false);
         _setPhase(PHASE_SCANNING);
@@ -499,7 +561,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     function _scheduleRescanExtended(isHardwareException as Lang.Boolean) {
         // If we just recovered from a hardware crash/throw, step back for 3 seconds
         // instead of 1 second to let the C++ Workarea connections settle down.
-        var delay = isHardwareException ? (BLE_OP_SPACING_MS * 3) : BLE_OP_SPACING_MS;
+        var delay = isHardwareException
+            ? BLE_OP_SPACING_MS * 3
+            : BLE_OP_SPACING_MS;
         _opTimer.stop();
         _opTimer.start(method(:restartScan), delay, false);
     }
@@ -518,7 +582,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             // Callback arrived in time, nothing to do.
             return;
         }
-        System.println("BLE: SAFETY NET — no DISCONNECTED callback after unpair, force-resetting state");
+        System.println(
+            "BLE: SAFETY NET — no DISCONNECTED callback after unpair, force-resetting state"
+        );
         // Force-clear everything as if _onDisconnected had fired.
         _connectedDevice = null;
         _discoveryDevice = null;
@@ -559,12 +625,18 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         if (_deferredUnpairDevice != null) {
             var dev = _deferredUnpairDevice;
             _deferredUnpairDevice = null;
-            System.println("BLE: attempting deferred unpairDevice on never-connected device");
+            System.println(
+                "BLE: attempting deferred unpairDevice on never-connected device"
+            );
             try {
                 BLE.unpairDevice(dev);
-                System.println("BLE: deferred unpairDevice succeeded (pending connection freed)");
+                System.println(
+                    "BLE: deferred unpairDevice succeeded (pending connection freed)"
+                );
             } catch (e) {
-                System.println("BLE: deferred unpairDevice threw: " + e.getErrorMessage());
+                System.println(
+                    "BLE: deferred unpairDevice threw: " + e.getErrorMessage()
+                );
                 // OS supervision timeout will eventually free the slot.
             }
         }
@@ -572,7 +644,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // Guard: if we're no longer in PHASE_SCANNING (e.g., a late
         // CONNECTED callback was accepted via Case 3), don't rescan.
         if (_phase != PHASE_SCANNING) {
-            System.println("BLE: _onDeferredUnpairAndRescan skipping rescan (phase=" + _phaseName(_phase) + ")");
+            System.println(
+                "BLE: _onDeferredUnpairAndRescan skipping rescan (phase=" +
+                    _phaseName(_phase) +
+                    ")"
+            );
             return;
         }
 
@@ -603,7 +679,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // would take long enough to widen the crash window.
     function onScanResults(scanResults) as Void {
         // Only act on scan results when we're actively looking for a device.
-        if (_phase != PHASE_SCANNING) { return; }
+        if (_phase != PHASE_SCANNING) {
+            return;
+        }
 
         var now = System.getTimer();
         var total = 0;
@@ -647,7 +725,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 // accumulated in _scanCollected and the existing window
                 // stays unchanged. Check size BEFORE adding so the
                 // guard fires exactly once per window.
-                var isFirstMatch = (_scanCollected.size() == 0);
+                var isFirstMatch = _scanCollected.size() == 0;
 
                 // Add or update this device in the collection array.
                 // If the same device advertises again during the window,
@@ -655,15 +733,30 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 _collectScanResult(scanResult, rssi);
 
                 if (isFirstMatch) {
-                    System.println("BLE: scan collect window opened (" + SCAN_COLLECT_MS + "ms)");
+                    System.println(
+                        "BLE: scan collect window opened (" +
+                            SCAN_COLLECT_MS +
+                            "ms)"
+                    );
                     _opTimer.stop();
-                    _opTimer.start(method(:_onScanCollectDone), SCAN_COLLECT_MS, false);
+                    _opTimer.start(
+                        method(:_onScanCollectDone),
+                        SCAN_COLLECT_MS,
+                        false
+                    );
                 }
             }
             result = scanResults.next();
         }
         if (total > 0) {
-            System.println("BLE: onScanResults total=" + total + " matched=" + matched + " collected=" + _scanCollected.size());
+            System.println(
+                "BLE: onScanResults total=" +
+                    total +
+                    " matched=" +
+                    matched +
+                    " collected=" +
+                    _scanCollected.size()
+            );
         }
     }
 
@@ -676,13 +769,18 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 // Update if the new RSSI is stronger (or the old was null).
                 var oldRssi = entry[:rssi];
                 if (oldRssi == null || (rssi != null && rssi > oldRssi)) {
-                    _scanCollected[i] = {:result => scanResult, :rssi => rssi};
+                    _scanCollected[i] = {
+                        :result => scanResult,
+                        :rssi => rssi,
+                    };
                 }
                 return;
             }
         }
-        _scanCollected.add({:result => scanResult, :rssi => rssi});
-        System.println("BLE: collected device #" + _scanCollected.size() + " rssi=" + rssi);
+        _scanCollected.add({ :result => scanResult, :rssi => rssi });
+        System.println(
+            "BLE: collected device #" + _scanCollected.size() + " rssi=" + rssi
+        );
     }
 
     // Phase 2: collection window closed — pick the best candidate and pair.
@@ -690,7 +788,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // Guard: if we left PHASE_SCANNING while the timer was pending
         // (e.g. widget closing), discard the collected results.
         if (_phase != PHASE_SCANNING) {
-            System.println("BLE: scan collect done but phase=" + _phaseName(_phase) + ", discarding");
+            System.println(
+                "BLE: scan collect done but phase=" +
+                    _phaseName(_phase) +
+                    ", discarding"
+            );
             _scanCollected = [];
             return;
         }
@@ -717,23 +819,36 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _scanCollected = [];
 
         var scanResult = best[:result] as BLE.ScanResult;
-        System.println("BLE: scan collect done — picked #" + (bestIdx + 1) + " of " + candidateCount + " candidates, rssi=" + bestRssi);
+        System.println(
+            "BLE: scan collect done — picked #" +
+                (bestIdx + 1) +
+                " of " +
+                candidateCount +
+                " candidates, rssi=" +
+                bestRssi
+        );
 
         // Re-check blacklist — the device could have been blacklisted
         // while the collection window was open.
         if (_isBlacklisted(scanResult, System.getTimer())) {
-            System.println("BLE: best candidate is now blacklisted, discarding");
+            System.println(
+                "BLE: best candidate is now blacklisted, discarding"
+            );
             return;
         }
 
         // Guard: verify a connection slot is available.
         try {
             if (BLE.getAvailableConnectionCount() <= 0) {
-                System.println("BLE: no available connections at collect-done, deferring");
+                System.println(
+                    "BLE: no available connections at collect-done, deferring"
+                );
                 return;
             }
         } catch (e) {
-            System.println("BLE: getAvailableConnectionCount threw at collect-done");
+            System.println(
+                "BLE: getAvailableConnectionCount threw at collect-done"
+            );
         }
 
         // Transition to CONNECTING *before* the BLE ops so the
@@ -743,8 +858,19 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
 
         // Log RSSI for diagnostics
         var pairRssi = "N/A";
-        try { var r = scanResult.getRssi(); if (r != null) { pairRssi = r.toString(); } } catch (e) {}
-        System.println("BLE: pairing with device (rssi=" + pairRssi + ", aborting=" + _aborting + ")");
+        try {
+            var r = scanResult.getRssi();
+            if (r != null) {
+                pairRssi = r.toString();
+            }
+        } catch (e) {}
+        System.println(
+            "BLE: pairing with device (rssi=" +
+                pairRssi +
+                ", aborting=" +
+                _aborting +
+                ")"
+        );
 
         // Stop the scan, then pair — exactly the SDK sample's sequence.
         try {
@@ -775,9 +901,16 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // every SCAN_REASSERT_MS; this callback resets the watchdog's phase
     // timer on confirmed success so we don't re-assert unnecessarily.
     function onScanStateChange(scanState, status) as Void {
-        System.println("BLE: onScanStateChange state=" + scanState + " status=" + status);
+        System.println(
+            "BLE: onScanStateChange state=" + scanState + " status=" + status
+        );
         if (status != BLE.STATUS_SUCCESS) {
-            System.println("BLE: scan state change FAILED status=" + status + " phase=" + _phaseName(_phase));
+            System.println(
+                "BLE: scan state change FAILED status=" +
+                    status +
+                    " phase=" +
+                    _phaseName(_phase)
+            );
             // Let the watchdog handle retry — no new recovery path here.
             return;
         }
@@ -799,9 +932,13 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // the UI can tell the user something is wrong.  Consistent with the
     // synchronous-exception path in OhMyWristApp.onStart (line 46).
     function onProfileRegister(uuid, status) as Void {
-        System.println("BLE: onProfileRegister uuid=" + uuid + " status=" + status);
+        System.println(
+            "BLE: onProfileRegister uuid=" + uuid + " status=" + status
+        );
         if (status != BLE.STATUS_SUCCESS) {
-            System.println("BLE: FATAL — profile registration failed, BLE will not work");
+            System.println(
+                "BLE: FATAL — profile registration failed, BLE will not work"
+            );
             StatusModel.setPhase("error");
             WatchUi.requestUpdate();
         }
@@ -811,7 +948,16 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // Connection state
     // ------------------------------------------------------------------
     function onConnectedStateChanged(device, state) {
-        System.println("BLE: onConnectedStateChanged state=" + state + " phase=" + _phaseName(_phase) + " aborting=" + _aborting + " hasDevice=" + (_connectedDevice != null));
+        System.println(
+            "BLE: onConnectedStateChanged state=" +
+                state +
+                " phase=" +
+                _phaseName(_phase) +
+                " aborting=" +
+                _aborting +
+                " hasDevice=" +
+                (_connectedDevice != null)
+        );
 
         // Cancel safety net timer — the callback arrived.
         // (_opTimer may be running as the abort safety net; stopping it
@@ -829,8 +975,13 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // This is a stale callback from a previous unpairDevice call — the
         // device was already cleaned up by _onDisconnected(). Ignore it to
         // prevent re-triggering the disconnect/unpair cycle.
-        if (_connectedDevice == null && state != BLE.CONNECTION_STATE_CONNECTED) {
-            System.println("BLE: ignoring stale DISCONNECTED (no tracked device)");
+        if (
+            _connectedDevice == null &&
+            state != BLE.CONNECTION_STATE_CONNECTED
+        ) {
+            System.println(
+                "BLE: ignoring stale DISCONNECTED (no tracked device)"
+            );
             return;
         }
         // Case 3: Late CONNECTED callback after we abandoned the connection
@@ -839,15 +990,22 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // but is still valid. Cancel any pending deferred unpair.
         // If we're already in a different phase (e.g. connecting to a new
         // device), drop this stale connection.
-        if (_connectedDevice == null && state == BLE.CONNECTION_STATE_CONNECTED) {
+        if (
+            _connectedDevice == null &&
+            state == BLE.CONNECTION_STATE_CONNECTED
+        ) {
             if (_phase == PHASE_SCANNING) {
-                System.println("BLE: late CONNECTED callback — accepting (phase=scanning)");
+                System.println(
+                    "BLE: late CONNECTED callback — accepting (phase=scanning)"
+                );
                 // Cancel the deferred unpair — we're keeping this connection.
                 _deferredUnpairDevice = null;
                 // Cancel any pending rescan/boot/collect timer.
                 _opTimer.stop();
                 // Stop scanning — we have a connection now.
-                try { BLE.setScanState(BLE.SCAN_STATE_OFF); } catch (e) {}
+                try {
+                    BLE.setScanState(BLE.SCAN_STATE_OFF);
+                } catch (e) {}
                 _connectedDevice = device;
                 _pendingScanResult = null;
                 // Set phase to CONNECTING momentarily so _onConnected's
@@ -855,7 +1013,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 _setPhase(PHASE_CONNECTING);
                 _onConnected(device);
             } else {
-                System.println("BLE: late CONNECTED callback — rejecting (phase=" + _phaseName(_phase) + ")");
+                System.println(
+                    "BLE: late CONNECTED callback — rejecting (phase=" +
+                        _phaseName(_phase) +
+                        ")"
+                );
                 try {
                     BLE.unpairDevice(device);
                 } catch (e) {
@@ -890,7 +1052,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // to scanning, the late CONNECTED callback is stale — drop the link
         // immediately instead of proceeding into discovery.
         if (_phase != PHASE_CONNECTING) {
-            System.println("BLE: stale onConnected (phase=" + _phaseName(_phase) + "), unpairing");
+            System.println(
+                "BLE: stale onConnected (phase=" +
+                    _phaseName(_phase) +
+                    "), unpairing"
+            );
             // Mark as aborting so the DISCONNECTED callback uses the
             // spaced _scheduleRescan() path instead of creating a competing
             // 5 s reconnect timer.
@@ -908,7 +1074,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // but the device immediately drops before we start discovery.
         try {
             if (!device.isConnected()) {
-                System.println("BLE: device not actually connected in _onConnected, bailing");
+                System.println(
+                    "BLE: device not actually connected in _onConnected, bailing"
+                );
                 return;
             }
         } catch (e) {
@@ -929,7 +1097,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
 
     function _tryDiscoverService() as Void {
         var device = _discoveryDevice;
-        if (device == null) { return; }
+        if (device == null) {
+            return;
+        }
 
         var service = null;
         try {
@@ -943,14 +1113,19 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             _discoveryAttempts++;
             if (_discoveryAttempts < DISCOVERY_ATTEMPT_MAX) {
                 _opTimer.stop();
-                _opTimer.start(method(:_tryDiscoverService),
-                               DISCOVERY_ATTEMPT_DELAY, false);
+                _opTimer.start(
+                    method(:_tryDiscoverService),
+                    DISCOVERY_ATTEMPT_DELAY,
+                    false
+                );
                 return;
             }
             // Discovery exhausted — blacklist this device so the next
             // scan won't immediately re-latch onto the same ghost advert,
             // then return to scanning straight away.
-            System.println("BLE: service discovery exhausted, blacklisting + rescanning");
+            System.println(
+                "BLE: service discovery exhausted, blacklisting + rescanning"
+            );
             _blacklistPending(System.getTimer());
             _abortToScanning();
             return;
@@ -966,7 +1141,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             ALERT_CHAR_UUID,
             STATS_CLAUDE_CHAR_UUID,
             STATS_OPENCODE_CHAR_UUID,
-            USAGE_CHAR_UUID
+            USAGE_CHAR_UUID,
         ];
         _setPhase(PHASE_SUBSCRIBING);
         _subscribeNext();
@@ -990,15 +1165,23 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 cccd = ch.getDescriptor(BLE.cccdUuid());
                 // Cache the characteristic reference for dispatch by identity
                 // in onCharacteristicChanged (avoids getUuid() native crash).
-                if (charUuid.equals(HISTORY_CHAR_UUID)) { _charHistory = ch; }
-                else if (charUuid.equals(ALERT_CHAR_UUID)) { _charAlert = ch; }
-                else if (charUuid.equals(STATS_CLAUDE_CHAR_UUID)) { _charStatsClaude = ch; }
-                else if (charUuid.equals(STATS_OPENCODE_CHAR_UUID)) { _charStatsOpencode = ch; }
-                else if (charUuid.equals(USAGE_CHAR_UUID)) { _charUsage = ch; }
+                if (charUuid.equals(HISTORY_CHAR_UUID)) {
+                    _charHistory = ch;
+                } else if (charUuid.equals(ALERT_CHAR_UUID)) {
+                    _charAlert = ch;
+                } else if (charUuid.equals(STATS_CLAUDE_CHAR_UUID)) {
+                    _charStatsClaude = ch;
+                } else if (charUuid.equals(STATS_OPENCODE_CHAR_UUID)) {
+                    _charStatsOpencode = ch;
+                } else if (charUuid.equals(USAGE_CHAR_UUID)) {
+                    _charUsage = ch;
+                }
             }
         } catch (e) {
             // Service/characteristic invalidated (device disconnecting).
-            System.println("BLE: _subscribeNext service access threw (disconnecting?)");
+            System.println(
+                "BLE: _subscribeNext service access threw (disconnecting?)"
+            );
             return;
         }
         if (ch == null || cccd == null) {
@@ -1018,7 +1201,13 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     }
 
     function _onDisconnected() {
-        System.println("BLE: _onDisconnected (aborting=" + _aborting + ", phase=" + _phaseName(_phase) + ")");
+        System.println(
+            "BLE: _onDisconnected (aborting=" +
+                _aborting +
+                ", phase=" +
+                _phaseName(_phase) +
+                ")"
+        );
 
         // ============================================================
         // CRITICAL: Do as LITTLE as possible inside this callback.
@@ -1061,7 +1250,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // DISCONNECTED callback. Safe to do allocations, UI updates, and start
     // timers here because we're outside the BLE callback context.
     function _onDisconnectDeferred() as Void {
-        System.println("BLE: _onDisconnectDeferred firing (wasAborting=" + _disconnectWasAborting + ")");
+        System.println(
+            "BLE: _onDisconnectDeferred firing (wasAborting=" +
+                _disconnectWasAborting +
+                ")"
+        );
 
         // Reset remaining connection-scoped state (involves allocations).
         _subscribeQueue = [];
@@ -1101,7 +1294,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // during an active PHASE_CONNECTING — disrupting the pairing
         // handshake.
         if (_phase != PHASE_SCANNING) {
-            System.println("BLE: onStart ignored (phase=" + _phaseName(_phase) + ")");
+            System.println(
+                "BLE: onStart ignored (phase=" + _phaseName(_phase) + ")"
+            );
             return;
         }
 
@@ -1119,13 +1314,19 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // setScanState(SCANNING) during PHASE_CONNECTING disrupts
         // the BLE pairing at the HCI level.
         if (_phase != PHASE_SCANNING) {
-            System.println("BLE: initializeScan skipped (phase=" + _phaseName(_phase) + ")");
+            System.println(
+                "BLE: initializeScan skipped (phase=" + _phaseName(_phase) + ")"
+            );
             return;
         }
         try {
-            Toybox.BluetoothLowEnergy.setScanState(Toybox.BluetoothLowEnergy.SCAN_STATE_SCANNING);
+            Toybox.BluetoothLowEnergy.setScanState(
+                Toybox.BluetoothLowEnergy.SCAN_STATE_SCANNING
+            );
         } catch (e) {
-            System.println("BLE: Boot scan failed, letting watchdog handle it.");
+            System.println(
+                "BLE: Boot scan failed, letting watchdog handle it."
+            );
         }
     }
 
@@ -1134,16 +1335,26 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // timer fires, return immediately.
     function restartScan() as Void {
         if (_phase != PHASE_SCANNING) {
-            System.println("BLE: restartScan no-op (phase=" + _phaseName(_phase) + ")");
+            System.println(
+                "BLE: restartScan no-op (phase=" + _phaseName(_phase) + ")"
+            );
             return;
         }
-        System.println("BLE: restartScan firing (aborting=" + _aborting + ", blacklist=" + _blacklist.size() + ")");
+        System.println(
+            "BLE: restartScan firing (aborting=" +
+                _aborting +
+                ", blacklist=" +
+                _blacklist.size() +
+                ")"
+        );
 
         try {
             var avail = BLE.getAvailableConnectionCount();
             System.println("BLE: availableConnectionCount=" + avail);
             if (avail <= 0) {
-                System.println("BLE: restartScan deferred (no available connections)");
+                System.println(
+                    "BLE: restartScan deferred (no available connections)"
+                );
                 // Use 5s delay — the OS supervision timeout needs time to
                 // free the occupied slot. This prevents rapid re-check loops.
                 _opTimer.stop();
@@ -1151,7 +1362,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 return;
             }
         } catch (e) {
-            System.println("BLE: getAvailableConnectionCount threw in restartScan. Backing off.");
+            System.println(
+                "BLE: getAvailableConnectionCount threw in restartScan. Backing off."
+            );
             _scheduleRescanExtended(true);
             return;
         }
@@ -1159,7 +1372,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         try {
             BLE.setScanState(BLE.SCAN_STATE_SCANNING);
         } catch (e) {
-            System.println("BLE: setScanState threw in restartScan. Stack busy. Backing off.");
+            System.println(
+                "BLE: setScanState threw in restartScan. Stack busy. Backing off."
+            );
             // CRITICAL FIX: If the OS rejects scanning, defer back out with an extended delay
             // instead of allowing a crash or locking up the state machine.
             _scheduleRescanExtended(true);
@@ -1184,7 +1399,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     function onCharacteristicChanged(characteristic, value) {
         // If all cached refs are null, we've already processed a disconnect.
         // The notification is stale — drop it silently.
-        if (_charStatsClaude == null) { return; }
+        if (_charStatsClaude == null) {
+            return;
+        }
 
         if (characteristic == _charStatsClaude) {
             var sc = _decodeUtf8(value);
@@ -1230,17 +1447,23 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // treat any decode failure as "ignore this value" and log to the
     // simulator console for diagnosis.
     function _decodeUtf8(bytes) {
-        if (bytes == null) { return null; }
+        if (bytes == null) {
+            return null;
+        }
         if (!(bytes instanceof Lang.ByteArray)) {
             System.println("BLE: _decodeUtf8 got non-ByteArray: " + bytes);
             return null;
         }
-        if (bytes.size() == 0) { return ""; }
+        if (bytes.size() == 0) {
+            return "";
+        }
         try {
             return StringUtil.convertEncodedString(bytes, {
                 :fromRepresentation => StringUtil.REPRESENTATION_BYTE_ARRAY,
-                :toRepresentation   => StringUtil.REPRESENTATION_STRING_PLAIN_TEXT,
-                :encoding           => StringUtil.CHAR_ENCODING_UTF8
+                :toRepresentation
+                =>
+                StringUtil.REPRESENTATION_STRING_PLAIN_TEXT,
+                :encoding => StringUtil.CHAR_ENCODING_UTF8,
             });
         } catch (e) {
             System.println("BLE: _decodeUtf8 threw on size=" + bytes.size());
@@ -1259,7 +1482,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     //   0x03 DESTRUCTIVE   — three rapid sharp pulses ("danger")
     //   0x04 AGENT_DONE    — one soft tap (quiet acknowledgement)
     function triggerHaptic(alertType) {
-        if (!(Attention has :vibrate)) { return; }
+        if (!(Attention has :vibrate)) {
+            return;
+        }
 
         var pattern;
 
@@ -1267,31 +1492,27 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             case 0x01:
                 pattern = [
                     new Attention.VibeProfile(80, 200),
-                    new Attention.VibeProfile(0,  150),
-                    new Attention.VibeProfile(80, 200)
+                    new Attention.VibeProfile(0, 150),
+                    new Attention.VibeProfile(80, 200),
                 ];
                 break;
 
             case 0x02:
-                pattern = [
-                    new Attention.VibeProfile(100, 600)
-                ];
+                pattern = [new Attention.VibeProfile(100, 600)];
                 break;
 
             case 0x03:
                 pattern = [
                     new Attention.VibeProfile(100, 120),
-                    new Attention.VibeProfile(0,   80),
+                    new Attention.VibeProfile(0, 80),
                     new Attention.VibeProfile(100, 120),
-                    new Attention.VibeProfile(0,   80),
-                    new Attention.VibeProfile(100, 120)
+                    new Attention.VibeProfile(0, 80),
+                    new Attention.VibeProfile(100, 120),
                 ];
                 break;
 
             case 0x04:
-                pattern = [
-                    new Attention.VibeProfile(60, 150)
-                ];
+                pattern = [new Attention.VibeProfile(60, 150)];
                 break;
 
             default:
@@ -1321,7 +1542,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // if the link dropped between the write and callback.
         try {
             if (!BLE.cccdUuid().equals(descriptor.getUuid())) {
-                System.println("BLE: onDescriptorWrite for non-CCCD descriptor, ignoring");
+                System.println(
+                    "BLE: onDescriptorWrite for non-CCCD descriptor, ignoring"
+                );
                 return;
             }
         } catch (e) {
@@ -1329,7 +1552,9 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             // Fall through and process normally: we're inside the subscribe
             // flow, and _currentSubscribingUuid was set, so this is almost
             // certainly a CCCD write. Logging the anomaly is enough.
-            System.println("BLE: descriptor.getUuid() threw in onDescriptorWrite (link dropping?)");
+            System.println(
+                "BLE: descriptor.getUuid() threw in onDescriptorWrite (link dropping?)"
+            );
         }
 
         // DEFENSIVE: If device disconnected while a CCCD write was in-flight,

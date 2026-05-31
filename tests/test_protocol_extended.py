@@ -81,9 +81,9 @@ class TestConstants:
             assert len(parts) == 5, f"Expected 5 parts in {uuid}"
             expected_lengths = [8, 4, 4, 4, 12]
             for part, expected in zip(parts, expected_lengths):
-                assert (
-                    len(part) == expected
-                ), f"Part {part!r} has length {len(part)}, expected {expected} in {uuid}"
+                assert len(part) == expected, (
+                    f"Part {part!r} has length {len(part)}, expected {expected} in {uuid}"
+                )
 
     def test_uuids_only_hex_and_hyphens(self):
         import re

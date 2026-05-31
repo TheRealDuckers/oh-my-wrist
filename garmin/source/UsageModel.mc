@@ -13,19 +13,24 @@
 using Toybox.Lang;
 
 module UsageModel {
-
     // 10-cell bars: each filled cell represents 10%.
     const BAR_CELLS = 10;
 
-    var sessionPct = -1;   // 5-hour window
-    var weekPct    = -1;   // 7-day window
+    var sessionPct = -1; // 5-hour window
+    var weekPct = -1; // 7-day window
 
     // Number of filled cells (0..BAR_CELLS) for a percentage; -1 stays 0.
     function filledCells(pct) {
-        if (pct < 0) { return 0; }
-        var n = (pct * BAR_CELLS + 50) / 100;  // round to nearest cell
-        if (n < 0) { return 0; }
-        if (n > BAR_CELLS) { return BAR_CELLS; }
+        if (pct < 0) {
+            return 0;
+        }
+        var n = (pct * BAR_CELLS + 50) / 100; // round to nearest cell
+        if (n < 0) {
+            return 0;
+        }
+        if (n > BAR_CELLS) {
+            return BAR_CELLS;
+        }
         return n;
     }
 
@@ -33,7 +38,7 @@ module UsageModel {
     function parsePayload(jsonStr) {
         try {
             sessionPct = _extractSigned(jsonStr, "\"s\":");
-            weekPct    = _extractSigned(jsonStr, "\"w\":");
+            weekPct = _extractSigned(jsonStr, "\"w\":");
         } catch (e) {
             // Stale display beats a crash.
         }
@@ -42,16 +47,22 @@ module UsageModel {
     // Extract a (possibly negative) integer following the key prefix, or -1.
     function _extractSigned(str, key) {
         var idx = str.find(key);
-        if (idx == null) { return -1; }
+        if (idx == null) {
+            return -1;
+        }
         idx += key.length();
         var end = idx;
         while (end < str.length()) {
             var ch = str.substring(end, end + 1);
-            if (ch.equals(",") || ch.equals("}")) { break; }
+            if (ch.equals(",") || ch.equals("}")) {
+                break;
+            }
             end++;
         }
         var token = str.substring(idx, end);
-        if (token == null || token.length() == 0) { return -1; }
+        if (token == null || token.length() == 0) {
+            return -1;
+        }
         var n = token.toNumber();
         return n == null ? -1 : n;
     }

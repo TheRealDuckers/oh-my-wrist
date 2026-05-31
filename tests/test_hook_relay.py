@@ -41,9 +41,9 @@ class TestHookRelayExitCode:
             }
         )
         result = _run_relay(payload)
-        assert (
-            result.returncode == 0
-        ), f"hook_relay exited with {result.returncode}; stderr: {result.stderr!r}"
+        assert result.returncode == 0, (
+            f"hook_relay exited with {result.returncode}; stderr: {result.stderr!r}"
+        )
 
     def test_exits_zero_on_empty_stdin(self):
         """Must exit 0 when stdin is empty (no event data)."""
