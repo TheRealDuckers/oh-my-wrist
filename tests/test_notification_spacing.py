@@ -36,7 +36,6 @@ class TestNotificationSpacing:
         """3 rapid IPC messages should produce notifications spaced ≥100ms apart."""
         daemon, mock_server = _make_daemon()
         timestamps: list[float] = []
-        original_update = mock_server.update_value
 
         def recording_update(*args, **kwargs):
             timestamps.append(time.monotonic())
@@ -79,9 +78,9 @@ class TestNotificationSpacing:
         # Each pair should be spaced ≥ _NOTIFY_SPACING_S apart
         for i in range(1, len(timestamps)):
             delta = timestamps[i] - timestamps[i - 1]
-            assert (
-                delta >= _NOTIFY_SPACING_S * 0.9
-            ), f"Notifications {i-1}→{i} spaced only {delta*1000:.1f}ms apart"
+            assert delta >= _NOTIFY_SPACING_S * 0.9, (
+                f"Notifications {i - 1}→{i} spaced only {delta * 1000:.1f}ms apart"
+            )
 
     def test_single_ipc_with_alert_and_stats_produces_spaced_burst(self):
         """A single IPC message that triggers HISTORY + ALERT + STATS should
@@ -128,9 +127,9 @@ class TestNotificationSpacing:
         # All consecutive pairs spaced ≥100ms
         for i in range(1, len(timestamps)):
             delta = timestamps[i] - timestamps[i - 1]
-            assert (
-                delta >= _NOTIFY_SPACING_S * 0.9
-            ), f"Notifications {i-1}→{i} spaced only {delta*1000:.1f}ms apart"
+            assert delta >= _NOTIFY_SPACING_S * 0.9, (
+                f"Notifications {i - 1}→{i} spaced only {delta * 1000:.1f}ms apart"
+            )
 
     def test_subscribe_burst_produces_spaced_notifications(self):
         """Subscribing to 3 characteristics rapidly coalesces into a single
@@ -177,9 +176,9 @@ class TestNotificationSpacing:
         assert len(timestamps) == 5
         for i in range(1, len(timestamps)):
             delta = timestamps[i] - timestamps[i - 1]
-            assert (
-                delta >= _NOTIFY_SPACING_S * 0.9
-            ), f"Notifications {i-1}→{i} spaced only {delta*1000:.1f}ms apart"
+            assert delta >= _NOTIFY_SPACING_S * 0.9, (
+                f"Notifications {i - 1}→{i} spaced only {delta * 1000:.1f}ms apart"
+            )
 
     def test_queue_drains_completely(self):
         """All enqueued notifications must eventually be delivered — no stuck items."""

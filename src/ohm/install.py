@@ -181,7 +181,9 @@ def _load_claude_settings() -> dict:
     try:
         return json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        logger.warning("Existing settings.json is not valid JSON — creating a fresh one")
+        logger.warning(
+            "Existing settings.json is not valid JSON — creating a fresh one"
+        )
         return {}
 
 

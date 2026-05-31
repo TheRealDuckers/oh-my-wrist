@@ -243,16 +243,6 @@ class TestRemoveOpencodePlugin:
     def test_handles_corrupt_opencode_json_on_remove(self, tmp_project):
         install_opencode_plugin(tmp_project)
         config_path = tmp_project / ".opencode" / "opencode.json"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text("{corrupt", encoding="utf-8")
-        # Should not raise
-        remove_opencode_plugin(tmp_project)
-        remove_opencode_plugin(tmp_project)
-        assert not plugin_path.exists()
-
-    def test_handles_corrupt_opencode_json_on_remove(self, tmp_project):
-        install_opencode_plugin(tmp_project)
-        config_path = tmp_project / ".opencode" / "opencode.json"
         config_path.write_text("{corrupt", encoding="utf-8")
         # Should not raise
         remove_opencode_plugin(tmp_project)

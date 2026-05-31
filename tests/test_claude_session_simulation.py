@@ -252,9 +252,9 @@ class TestEncoderSimulation:
                 continue
             canonical = _canonical(step)
             decoded = decode_frame(encode_event(canonical))
-            assert (
-                decoded["flags"] & FLAG_SPINNER
-            ), f"Step '{step.description}': missing SPINNER flag"
+            assert decoded["flags"] & FLAG_SPINNER, (
+                f"Step '{step.description}': missing SPINNER flag"
+            )
 
     def test_post_tool_use_always_check_icon(self):
         for step in SESSION:
@@ -302,16 +302,16 @@ class TestDaemonSimulation:
     def test_all_frames_within_limit(self):
         _, _, history = self._run_session()
         for desc, frame, _ in history:
-            assert (
-                len(frame) <= MAX_FRAME_LEN
-            ), f"Step '{desc}': frame {len(frame)} bytes, limit {MAX_FRAME_LEN}"
+            assert len(frame) <= MAX_FRAME_LEN, (
+                f"Step '{desc}': frame {len(frame)} bytes, limit {MAX_FRAME_LEN}"
+            )
 
     def test_all_frames_decode(self):
         _, _, history = self._run_session()
         for desc, frame, _ in history:
-            assert (
-                decode_frame(frame) is not None
-            ), f"Step '{desc}': frame failed to decode"
+            assert decode_frame(frame) is not None, (
+                f"Step '{desc}': frame failed to decode"
+            )
 
     def test_session_flag_cleared_after_stop(self):
         _, _, history = self._run_session()
@@ -321,9 +321,9 @@ class TestDaemonSimulation:
     def test_session_flag_active_during_session(self):
         _, _, history = self._run_session()
         for desc, _, flag in history[:-1]:
-            assert (
-                flag == b"\x01"
-            ), f"Step '{desc}': session flag should be 0x01, got {flag!r}"
+            assert flag == b"\x01", (
+                f"Step '{desc}': session flag should be 0x01, got {flag!r}"
+            )
 
     def test_update_value_called_per_step(self):
         daemon, mock_server, history = self._run_session()
@@ -338,9 +338,9 @@ class TestDaemonSimulation:
         _, _, history = self._run_session()
         first_desc, first_frame, _ = history[0]
         decoded = decode_frame(first_frame)
-        assert decoded["icon"] == int(
-            IconId.GREEN_CIRCLE
-        ), f"First step '{first_desc}' icon {decoded['icon']:#x}"
+        assert decoded["icon"] == int(IconId.GREEN_CIRCLE), (
+            f"First step '{first_desc}' icon {decoded['icon']:#x}"
+        )
 
 
 # ============================================================================

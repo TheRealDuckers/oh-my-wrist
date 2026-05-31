@@ -20,17 +20,15 @@
 using Toybox.Lang;
 
 class StatsData {
-
-    var duration       = 0;
-    var toolCalls      = 0;
-    var filesEdited    = 0;
-    var bashCount      = 0;
-    var idleSeconds    = 0;
+    var duration = 0;
+    var toolCalls = 0;
+    var filesEdited = 0;
+    var bashCount = 0;
+    var idleSeconds = 0;
     var lastCompletion = "never";
-    var provider       = "";
+    var provider = "";
 
-    function initialize() {
-    }
+    function initialize() {}
 
     // -----------------------------------------------------------------------
     // parsePayload — update all fields from a compact JSON string
@@ -38,10 +36,10 @@ class StatsData {
 
     function parsePayload(jsonStr) {
         try {
-            duration    = _extractNumber(jsonStr, "\"d\":");
-            toolCalls   = _extractNumber(jsonStr, "\"t\":");
+            duration = _extractNumber(jsonStr, "\"d\":");
+            toolCalls = _extractNumber(jsonStr, "\"t\":");
             filesEdited = _extractNumber(jsonStr, "\"e\":");
-            bashCount   = _extractNumber(jsonStr, "\"b\":");
+            bashCount = _extractNumber(jsonStr, "\"b\":");
             idleSeconds = _extractNumber(jsonStr, "\"i\":");
 
             var secs = _extractSignedNumber(jsonStr, "\"s\":");
@@ -52,9 +50,13 @@ class StatsData {
             }
 
             var pid = _extractNumber(jsonStr, "\"p\":");
-            if (pid == 1)      { provider = "C"; }
-            else if (pid == 2) { provider = "O"; }
-            else               { provider = "";  }
+            if (pid == 1) {
+                provider = "C";
+            } else if (pid == 2) {
+                provider = "O";
+            } else {
+                provider = "";
+            }
         } catch (e) {
             // Silently ignore parse errors — stale display is better than crash.
         }
@@ -69,25 +71,30 @@ class StatsData {
     // Extract a (possibly negative) numeric value, or null if absent.
     function _extractSignedNumber(str, key) {
         var idx = str.find(key);
-        if (idx == null) { return null; }
+        if (idx == null) {
+            return null;
+        }
         idx += key.length();
         var end = idx;
         while (end < str.length()) {
             var ch = str.substring(end, end + 1);
-            if (ch.equals(",") || ch.equals("}")) { break; }
+            if (ch.equals(",") || ch.equals("}")) {
+                break;
+            }
             end++;
         }
         var token = str.substring(idx, end);
-        if (token == null || token.length() == 0) { return null; }
+        if (token == null || token.length() == 0) {
+            return null;
+        }
         return token.toNumber();
     }
 }
 
 module StatsModel {
-
     // Per-provider instances. Constructed lazily on first access so that the
     // module load order is safe.
-    var claude   = new StatsData();
+    var claude = new StatsData();
     var opencode = new StatsData();
 
     // -----------------------------------------------------------------------
@@ -95,8 +102,12 @@ module StatsModel {
     // -----------------------------------------------------------------------
 
     function formatDuration(secs) {
-        if (secs < 60)   { return secs.toString() + "s"; }
-        if (secs < 3600) { return (secs / 60).toString() + "m"; }
+        if (secs < 60) {
+            return secs.toString() + "s";
+        }
+        if (secs < 3600) {
+            return (secs / 60).toString() + "m";
+        }
         return (secs / 3600).toString() + "h";
     }
 }

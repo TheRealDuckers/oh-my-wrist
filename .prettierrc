@@ -1,0 +1,9 @@
+{
+  "plugins": ["@markw65/prettier-plugin-monkeyc"],
+  "overrides": [
+    {
+      "files": "*.mc",
+      "options": { "parser": "monkeyc" }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: monkeyc-format
+        name: monkeyc-format (prettier)
+        entry: npx prettier --write
+        language: node
+        additional_dependencies:
+          - prettier@3.8.3
+          - "@markw65/prettier-plugin-monkeyc@1.0.67"
+        files: \.mc$

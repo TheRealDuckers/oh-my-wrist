@@ -50,8 +50,9 @@ def _make_config_dir(tmp_path: Path):
 class TestConfigDefaults:
     def test_defaults_when_file_absent(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import load_config
 
@@ -64,8 +65,9 @@ class TestConfigDefaults:
         config_dir, config_path = _make_config_dir(tmp_path)
         config_dir.mkdir(parents=True)
         config_path.write_text("{}\n", encoding="utf-8")
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import load_config
 
@@ -77,8 +79,9 @@ class TestConfigDefaults:
         config_dir, config_path = _make_config_dir(tmp_path)
         config_dir.mkdir(parents=True)
         config_path.write_text("NOT JSON {{{", encoding="utf-8")
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import load_config
 
@@ -89,8 +92,9 @@ class TestConfigDefaults:
         config_dir, config_path = _make_config_dir(tmp_path)
         config_dir.mkdir(parents=True)
         config_path.write_text("[1, 2, 3]\n", encoding="utf-8")
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import load_config
 
@@ -101,8 +105,9 @@ class TestConfigDefaults:
         config_dir, config_path = _make_config_dir(tmp_path)
         config_dir.mkdir(parents=True)
         config_path.write_text('{"haptic_enabled": false}\n', encoding="utf-8")
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import load_config
 
@@ -120,8 +125,9 @@ class TestConfigDefaults:
 class TestSaveConfig:
     def test_save_writes_valid_json(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import Config, save_config
 
@@ -136,8 +142,9 @@ class TestSaveConfig:
 
     def test_save_trailing_newline(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import Config, save_config
 
@@ -147,8 +154,9 @@ class TestSaveConfig:
 
     def test_save_no_temp_files_left(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import Config, save_config
 
@@ -160,8 +168,9 @@ class TestSaveConfig:
     def test_save_creates_config_dir(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
         assert not config_dir.exists()
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import Config, save_config
 
@@ -177,8 +186,9 @@ class TestSaveConfig:
 class TestSetters:
     def test_set_haptic_false(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import set_haptic, load_config
 
@@ -188,8 +198,9 @@ class TestSetters:
 
     def test_set_haptic_true(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import set_haptic, load_config
 
@@ -200,8 +211,9 @@ class TestSetters:
 
     def test_set_quiet_start(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import set_quiet_start, load_config
 
@@ -211,8 +223,9 @@ class TestSetters:
 
     def test_set_quiet_end(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import set_quiet_end, load_config
 
@@ -222,8 +235,9 @@ class TestSetters:
 
     def test_set_returns_config_object(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
-        with patch("ohm.config.CONFIG_DIR", config_dir), patch(
-            "ohm.config.CONFIG_PATH", config_path
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
         ):
             from ohm.config import set_haptic
 

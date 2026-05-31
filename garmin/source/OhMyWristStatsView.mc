@@ -23,7 +23,6 @@ using Toybox.Graphics;
 using Toybox.System;
 
 class OhMyWristStatsView extends WatchUi.View {
-
     var _stats;
     var _title;
 
@@ -49,7 +48,9 @@ class OhMyWristStatsView extends WatchUi.View {
         var shape = System.getDeviceSettings().screenShape;
         var chromeFont = Graphics.FONT_XTINY;
         var stepPx = (h * 0.02).toNumber();
-        if (stepPx < 1) { stepPx = 1; }
+        if (stepPx < 1) {
+            stepPx = 1;
+        }
 
         // Header — chrome gray, centered.
         // Stats can sit slightly lower than the history view because the
@@ -61,15 +62,25 @@ class OhMyWristStatsView extends WatchUi.View {
             (h * 0.24).toNumber(),
             stepPx,
             headerTextW,
-            w, h, shape,
-            0.90
+            w,
+            h,
+            shape,
+            0.9
         );
 
         dc.setColor(Palette.chrome(), Graphics.COLOR_TRANSPARENT);
-        var headerAvail = (TextUtil.getChordWidth(w, h, headerY, shape) * 0.90).toNumber();
-        var headerDraw = (headerTextW <= headerAvail)
-            ? _title
-            : TextUtil.fitMiddleTruncate(dc, _title, chromeFont, headerAvail);
+        var headerAvail = (
+            TextUtil.getChordWidth(w, h, headerY, shape) * 0.9
+        ).toNumber();
+        var headerDraw =
+            headerTextW <= headerAvail
+                ? _title
+                : TextUtil.fitMiddleTruncate(
+                      dc,
+                      _title,
+                      chromeFont,
+                      headerAvail
+                  );
         dc.drawText(
             w / 2,
             headerY,
@@ -81,14 +92,14 @@ class OhMyWristStatsView extends WatchUi.View {
         // Rows — label in chrome, value in primary text.  Both left-justified
         // at fixed column starts to mimic a terminal table.
         var rows = [
-            ["dur",   StatsModel.formatDuration(_stats.duration)],
+            ["dur", StatsModel.formatDuration(_stats.duration)],
             ["calls", _stats.toolCalls.toString()],
             ["files", _stats.filesEdited.toString()],
-            ["bash",  _stats.bashCount.toString()],
-            ["idle",  StatsModel.formatDuration(_stats.idleSeconds)]
+            ["bash", _stats.bashCount.toString()],
+            ["idle", StatsModel.formatDuration(_stats.idleSeconds)],
         ];
 
-        var rowH  = (h * 0.56) / rows.size();
+        var rowH = (h * 0.56) / rows.size();
         var baseY = h * 0.26;
 
         var labelX = (w * 0.22).toNumber();
@@ -100,7 +111,8 @@ class OhMyWristStatsView extends WatchUi.View {
             // Label — chrome gray.
             dc.setColor(Palette.chrome(), Graphics.COLOR_TRANSPARENT);
             dc.drawText(
-                labelX, y,
+                labelX,
+                y,
                 Graphics.FONT_TINY,
                 rows[i][0],
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
@@ -110,7 +122,8 @@ class OhMyWristStatsView extends WatchUi.View {
             // common gutter (terminal-table style).
             dc.setColor(Palette.text(), Graphics.COLOR_TRANSPARENT);
             dc.drawText(
-                valueX, y,
+                valueX,
+                y,
                 Graphics.FONT_TINY,
                 rows[i][1],
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
@@ -122,19 +135,29 @@ class OhMyWristStatsView extends WatchUi.View {
         var footerText = "done: " + _stats.lastCompletion;
         var footerTextW = dc.getTextWidthInPixels(footerText, chromeFont);
         var footerY = TextUtil.findFitY(
-            (h * 0.90).toNumber(),
-            (h * 0.80).toNumber(),
+            (h * 0.9).toNumber(),
+            (h * 0.8).toNumber(),
             stepPx,
             footerTextW,
-            w, h, shape,
-            0.90
+            w,
+            h,
+            shape,
+            0.9
         );
 
         dc.setColor(Palette.chrome(), Graphics.COLOR_TRANSPARENT);
-        var footerAvail = (TextUtil.getChordWidth(w, h, footerY, shape) * 0.90).toNumber();
-        var footerDraw = (footerTextW <= footerAvail)
-            ? footerText
-            : TextUtil.fitMiddleTruncate(dc, footerText, chromeFont, footerAvail);
+        var footerAvail = (
+            TextUtil.getChordWidth(w, h, footerY, shape) * 0.9
+        ).toNumber();
+        var footerDraw =
+            footerTextW <= footerAvail
+                ? footerText
+                : TextUtil.fitMiddleTruncate(
+                      dc,
+                      footerText,
+                      chromeFont,
+                      footerAvail
+                  );
         dc.drawText(
             w / 2,
             footerY,

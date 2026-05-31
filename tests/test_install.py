@@ -177,9 +177,9 @@ class TestPatchClaudeSettings:
             for entry in entries:
                 for hook in entry.get("hooks", []):
                     if hook.get("command") == _HOOK_COMMAND:
-                        assert (
-                            hook.get("async") is True
-                        ), f"async flag not True in event {event}: {hook}"
+                        assert hook.get("async") is True, (
+                            f"async flag not True in event {event}: {hook}"
+                        )
 
     def test_idempotent_double_install(self, tmp_path):
         settings_path = tmp_path / ".claude" / "settings.json"
@@ -195,9 +195,9 @@ class TestPatchClaudeSettings:
                 for hook in entry.get("hooks", [])
                 if hook.get("command") == _HOOK_COMMAND
             ]
-            assert (
-                len(our_hooks) == 1
-            ), f"Event {event} has {len(our_hooks)} copies of our hook (expected 1)"
+            assert len(our_hooks) == 1, (
+                f"Event {event} has {len(our_hooks)} copies of our hook (expected 1)"
+            )
 
     def test_preserves_existing_hooks(self, tmp_path):
         settings_path = tmp_path / ".claude" / "settings.json"

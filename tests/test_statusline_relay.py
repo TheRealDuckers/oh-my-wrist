@@ -86,17 +86,13 @@ class TestChaining:
         assert captured.get("out") == "CHAINED"
 
     def test_no_prev_file_is_noop(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(
-            relay, "_PREV_STATUSLINE_PATH", tmp_path / "missing"
-        )
+        monkeypatch.setattr(relay, "_PREV_STATUSLINE_PATH", tmp_path / "missing")
         relay._chain_previous("{}")  # must not raise
 
 
 class TestExitCode:
     def test_exits_zero_on_valid_input(self):
-        payload = json.dumps(
-            {"rate_limits": {"five_hour": {"used_percentage": 5}}}
-        )
+        payload = json.dumps({"rate_limits": {"five_hour": {"used_percentage": 5}}})
         assert _run(payload).returncode == 0
 
     def test_exits_zero_on_empty_stdin(self):

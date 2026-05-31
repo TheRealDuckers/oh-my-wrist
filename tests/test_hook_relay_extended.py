@@ -269,9 +269,9 @@ class TestRelayIdempotency:
         ]
         for payload in events:
             result = _run(payload)
-            assert (
-                result.returncode == 0
-            ), f"Non-zero exit for {payload!r}: {result.stderr!r}"
+            assert result.returncode == 0, (
+                f"Non-zero exit for {payload!r}: {result.stderr!r}"
+            )
 
 
 # ============================================================================
@@ -289,9 +289,9 @@ class TestRelayStdout:
             }
         )
         result = _run(payload)
-        assert (
-            result.stdout == ""
-        ), f"hook_relay must not write to stdout; got: {result.stdout!r}"
+        assert result.stdout == "", (
+            f"hook_relay must not write to stdout; got: {result.stdout!r}"
+        )
 
     def test_no_stdout_output_on_empty_stdin(self):
         result = _run("")

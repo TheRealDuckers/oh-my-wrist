@@ -39,8 +39,9 @@ def _paths(tmp_path):
 class TestPatchStatusline:
     def test_fresh_install_sets_ours(self, tmp_path):
         settings, prev = _paths(tmp_path)
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             patch_claude_statusline()
         assert _read(settings)["statusLine"]["command"] == _STATUSLINE_COMMAND
@@ -49,8 +50,9 @@ class TestPatchStatusline:
     def test_install_over_existing_saves_original(self, tmp_path):
         settings, prev = _paths(tmp_path)
         _write(settings, {"statusLine": {"type": "command", "command": "my-bar.sh"}})
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             patch_claude_statusline()
         assert _read(settings)["statusLine"]["command"] == _STATUSLINE_COMMAND
@@ -59,8 +61,9 @@ class TestPatchStatusline:
     def test_reinstall_is_idempotent(self, tmp_path):
         settings, prev = _paths(tmp_path)
         _write(settings, {"statusLine": {"type": "command", "command": "my-bar.sh"}})
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             patch_claude_statusline()
             patch_claude_statusline()  # second call must not overwrite saved original
@@ -71,8 +74,9 @@ class TestRemoveStatusline:
     def test_uninstall_restores_original(self, tmp_path):
         settings, prev = _paths(tmp_path)
         _write(settings, {"statusLine": {"type": "command", "command": "my-bar.sh"}})
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             patch_claude_statusline()
             remove_claude_statusline()
@@ -81,8 +85,9 @@ class TestRemoveStatusline:
 
     def test_uninstall_no_prior_removes_key(self, tmp_path):
         settings, prev = _paths(tmp_path)
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             patch_claude_statusline()
             remove_claude_statusline()
@@ -91,8 +96,9 @@ class TestRemoveStatusline:
     def test_uninstall_leaves_foreign_statusline(self, tmp_path):
         settings, prev = _paths(tmp_path)
         _write(settings, {"statusLine": {"type": "command", "command": "other-tool"}})
-        with patch("ohm.install.CLAUDE_SETTINGS_PATH", settings), patch(
-            "ohm.install._PREV_STATUSLINE_PATH", prev
+        with (
+            patch("ohm.install.CLAUDE_SETTINGS_PATH", settings),
+            patch("ohm.install._PREV_STATUSLINE_PATH", prev),
         ):
             remove_claude_statusline()
         assert _read(settings)["statusLine"]["command"] == "other-tool"

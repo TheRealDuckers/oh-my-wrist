@@ -121,9 +121,10 @@ class TestSendAlert:
 
     def test_send_alert_resets_to_zero_after_delay(self):
         daemon, mock_server, mock_char = _make_daemon()
-        with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.sleep", new_callable=AsyncMock
-        ) as mock_sleep:
+        with (
+            patch("ohm.ble_daemon.load_config") as mock_cfg,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
             )
@@ -154,9 +155,10 @@ class TestSendAlert:
 
     def test_send_alert_none_does_not_sleep(self):
         daemon, mock_server, mock_char = _make_daemon()
-        with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.sleep", new_callable=AsyncMock
-        ) as mock_sleep:
+        with (
+            patch("ohm.ble_daemon.load_config") as mock_cfg,
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
             )
@@ -179,8 +181,9 @@ class TestSendAlert:
     )
     def test_all_alert_types_handled(self, alert_type):
         daemon, mock_server, mock_char = _make_daemon()
-        with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.sleep", new_callable=AsyncMock
+        with (
+            patch("ohm.ble_daemon.load_config") as mock_cfg,
+            patch("asyncio.sleep", new_callable=AsyncMock),
         ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
@@ -255,9 +258,12 @@ class TestHandleUnixClientFeatures:
         writer = MagicMock()
         writer.close = MagicMock()
 
-        with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.ensure_future", side_effect=lambda coro: coro.close()
-        ) as mock_future:
+        with (
+            patch("ohm.ble_daemon.load_config") as mock_cfg,
+            patch(
+                "asyncio.ensure_future", side_effect=lambda coro: coro.close()
+            ) as mock_future,
+        ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)
             )
@@ -309,8 +315,9 @@ class TestHandleUnixClientFeatures:
         writer = MagicMock()
         writer.close = MagicMock()
 
-        with patch("ohm.ble_daemon.load_config") as mock_cfg, patch(
-            "asyncio.ensure_future", side_effect=lambda coro: coro.close()
+        with (
+            patch("ohm.ble_daemon.load_config") as mock_cfg,
+            patch("asyncio.ensure_future", side_effect=lambda coro: coro.close()),
         ):
             mock_cfg.return_value = MagicMock(
                 haptic_allowed=MagicMock(return_value=True)

@@ -33,15 +33,15 @@ from pydantic import BaseModel, Field
 
 # GATT Service UUID (custom 128-bit). Must match the Garmin Connect IQ
 # app's OHM_SERVICE_UUID constant in BleManager.mc.
-OHM_SERVICE_UUID = "12345678-1234-1234-1234-1234567890AB"
+OHM_SERVICE_UUID = "0FA155B0-0C21-723A-970C-9821F1C5FFAB"
 
 # Characteristic: per-event history frame (binary, max MAX_FRAME_LEN bytes,
 # notifiable).  See HISTORY PROTOCOL below.  The watch maintains the history
 # deque locally; each frame is one event.
-HISTORY_CHAR_UUID = "12345678-1234-1234-1234-1234567890AC"
+HISTORY_CHAR_UUID = "0FA155B1-0C21-723A-970C-9821F1C5FFAB"
 
 # Characteristic: session active flag (1 byte: 0x00 = idle, 0x01 = active)
-SESSION_CHAR_UUID = "12345678-1234-1234-1234-1234567890AD"
+SESSION_CHAR_UUID = "0FA155B2-0C21-723A-970C-9821F1C5FFAB"
 
 # Characteristic: alert type (1 byte) — triggers haptic feedback on the watch
 # Value meanings:
@@ -50,17 +50,17 @@ SESSION_CHAR_UUID = "12345678-1234-1234-1234-1234567890AD"
 #   0x02 = SESSION_DONE  — session has ended (Stop/session_stop event)
 #   0x03 = DESTRUCTIVE   — about to run a potentially destructive shell command
 #   0x04 = AGENT_DONE    — a sub-agent has completed
-ALERT_CHAR_UUID = "12345678-1234-1234-1234-1234567890AE"
+ALERT_CHAR_UUID = "0FA155B3-0C21-723A-970C-9821F1C5FFAB"
 
 # Per-provider session statistics payloads (compact JSON, UTF-8, max 100 bytes, notifiable).
 # Each provider gets its own characteristic so concurrent sessions don't clobber each other.
-STATS_CLAUDE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B0"
-STATS_OPENCODE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B1"
+STATS_CLAUDE_CHAR_UUID = "0FA155B4-0C21-723A-970C-9821F1C5FFAB"
+STATS_OPENCODE_CHAR_UUID = "0FA155B5-0C21-723A-970C-9821F1C5FFAB"
 
 # Claude usage / rate-limit quota payload (compact JSON, UTF-8, notifiable).
 # Carries the /usage-equivalent session (5-hour) and week (7-day) used
 # percentages.  Claude-only — OpenCode has no equivalent.
-USAGE_CHAR_UUID = "12345678-1234-1234-1234-1234567890B2"
+USAGE_CHAR_UUID = "0FA155B6-0C21-723A-970C-9821F1C5FFAB"
 
 # History wire protocol
 # ----------------------

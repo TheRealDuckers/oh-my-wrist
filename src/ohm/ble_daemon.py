@@ -1678,7 +1678,7 @@ class BleDaemon:
                 await asyncio.sleep(1)
                 continue
 
-            connected = await loop.run_in_executor(
+            _ = await loop.run_in_executor(
                 None,
                 lambda h=handle: ctypes.windll.kernel32.ConnectNamedPipe(h, None),  # type: ignore[attr-defined]
             )

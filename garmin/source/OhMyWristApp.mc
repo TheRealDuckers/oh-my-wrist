@@ -12,7 +12,6 @@ using Toybox.BluetoothLowEnergy as BLE;
 using Toybox.WatchUi;
 
 class OhMyWristApp extends Application.AppBase {
-
     // Hold a strong reference to the delegate so it is not garbage-collected.
     var bleDelegate;
 
@@ -39,7 +38,9 @@ class OhMyWristApp extends Application.AppBase {
         try {
             registerBleProfile();
         } catch (ex) {
-            System.println("BLE: registerProfile failed: " + ex.getErrorMessage());
+            System.println(
+                "BLE: registerProfile failed: " + ex.getErrorMessage()
+            );
             StatusModel.setPhase("error");
             return;
         }
