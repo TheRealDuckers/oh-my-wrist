@@ -52,6 +52,17 @@ dev = [
     "ruff>=0.15,<0.16",
 ]
 
+[tool.uv]
+override-dependencies = [
+    "winrt-Windows.Devices.Bluetooth>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Devices.Bluetooth.Advertisement>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Devices.Bluetooth.GenericAttributeProfile>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Devices.Enumeration>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Foundation>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Foundation.Collections>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+    "winrt-Windows.Storage.Streams>=3.1; platform_system == 'Windows' and python_version >= '3.12'",
+]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 88

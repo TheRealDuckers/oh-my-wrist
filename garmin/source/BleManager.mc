@@ -220,7 +220,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // Devices whose entry is present and not yet expired are skipped by
     // onScanResults — breaks the ghost-advert loop where the watch keeps
     // re-pairing with a cached advertisement of a dead daemon.
-    var _blacklist as Lang.Array;
+    var _blacklist as Lang.Array<Lang.Dictionary>;
 
     // Re-entrancy guard for _abortToScanning(). When true, the abort is
     // in-flight (e.g. waiting for a DISCONNECTED callback after unpairDevice).
@@ -243,7 +243,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // _scanCollected for SCAN_COLLECT_MS before the best (highest RSSI)
     // is chosen for pairing.  Each entry is {:result => ScanResult,
     // :rssi => Number or null}.
-    var _scanCollected as Lang.Array = [];
+    var _scanCollected as Lang.Array<Lang.Dictionary> = [];
 
     function initialize() {
         BleDelegate.initialize();
