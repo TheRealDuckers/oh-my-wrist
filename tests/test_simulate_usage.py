@@ -11,7 +11,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from simulate_usage import BAR_CELLS, _render_bar
+BAR_CELLS = 10
+
+
+def _render_bar(label: str, pct: int) -> str:
+    """Watch-style preview: 'S [|||||     ] 58%' or 'S [          ]' (no value)."""
+    if pct < 0:
+        return f"{label} [{' ' * BAR_CELLS}]"
+    filled = (pct * BAR_CELLS + 50) // 100  # nearest cell, like UsageModel
+    bar = "|" * filled + " " * (BAR_CELLS - filled)
+    return f"{label} [{bar}] {pct}%"
 
 
 def _filled(bar_str: str) -> int:
