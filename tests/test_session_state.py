@@ -239,6 +239,7 @@ class TestIdleTimer:
     def test_idle_stops_on_tool_start(self):
         s = SessionState()
         s.on_event(_ev("session_idle"))
+        time.sleep(0.01)
         s.on_event(_ev("tool_start", tool_name="Bash"))
         assert s.last_idle_start is None
         assert s.idle_seconds > 0

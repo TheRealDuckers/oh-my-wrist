@@ -269,7 +269,9 @@ class TestIpcSocketLifecycle:
         assert SOCKET_PATH == "/tmp/ohm.sock"
 
     def test_stale_socket_file_removed_on_startup(self):
-        stale_path = SOCKET_PATH + ".test_stale"
+        import tempfile
+
+        stale_path = os.path.join(tempfile.gettempdir(), "ohm.sock.test_stale")
         Path(stale_path).write_bytes(b"stale")
         try:
             os.unlink(stale_path)
@@ -278,7 +280,9 @@ class TestIpcSocketLifecycle:
             Path(stale_path).unlink(missing_ok=True)
 
     def test_missing_socket_file_unlink_raises(self):
-        non_existent = "/tmp/ohm_nonexistent_test.sock"
+        import tempfile
+
+        non_existent = os.path.join(tempfile.gettempdir(), "ohm_nonexistent_test.sock")
         with pytest.raises(FileNotFoundError):
             os.unlink(non_existent)
 
