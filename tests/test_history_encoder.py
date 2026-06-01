@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from ohm.history_encoder import _classify, decode_frame, encode_event
+from ohm.history_encoder import _classify, _shell_label, decode_frame, encode_event
 from ohm.icons import (
     FLAG_ACCENT,
     FLAG_CLEAR_PREV_SPINNER,
@@ -96,6 +96,55 @@ class TestToolStartClassification:
         assert icon == IconId.WRENCH
         assert flags & FLAG_SPINNER
         assert text == "MysteryTool"
+
+    def test_shell_skips_leading_cd(self):
+        _, _, text = _classify(
+            _ev("tool_start", tool_name="Bash", label="cd /repo && pytest -x")
+        )
+        assert text == "pytest"
+
+    def test_shell_standalone_cd_shows_dirname(self):
+        _, _, text = _classify(
+            _ev("tool_start", tool_name="Bash", label="cd /home/jason/ai/oh-my-wrist")
+        )
+        assert text == "oh-my-wrist"
+
+
+# ============================================================================
+# _shell_label — cd-skipping extraction
+# ============================================================================
+
+
+class TestShellLabel:
+    def test_simple_command(self):
+        assert _shell_label("pytest -x tests/") == "pytest"
+
+    def test_cd_then_ampamp(self):
+        assert _shell_label("cd /repo && git status") == "git"
+
+    def test_cd_then_semicolon(self):
+        assert _shell_label("cd /repo; npm test") == "npm"
+
+    def test_multiple_cds_then_command(self):
+        assert _shell_label("cd /a && cd sub && ruff check .") == "ruff"
+
+    def test_standalone_cd_returns_basename(self):
+        assert _shell_label("cd /home/user/project") == "project"
+
+    def test_standalone_cd_trailing_slash(self):
+        assert _shell_label("cd /home/user/project/") == "project"
+
+    def test_bare_cd(self):
+        assert _shell_label("cd") == "cd"
+
+    def test_empty_string(self):
+        assert _shell_label("") == ""
+
+    def test_no_cd_at_all(self):
+        assert _shell_label("git push origin main") == "git"
+
+    def test_cd_in_middle_not_skipped(self):
+        assert _shell_label("echo hello && cd /tmp") == "echo"
 
 
 # ============================================================================

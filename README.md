@@ -34,6 +34,12 @@
 pip install oh-my-wrist
 ```
 
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv pip install oh-my-wrist
+```
+
 ### 2. Configure providers and system service
 
 ```bash
@@ -171,11 +177,15 @@ To remove the watch app, delete it via Garmin Express or the Connect IQ app on y
 ## Development
 
 ```bash
+# pip
 pip install -e ".[dev]"
 pytest tests/
+
+# or uv
+uv venv && uv pip install -e ".[dev]"
+uv run pytest
+
 oh-my-wrist start --foreground
-python tools/simulate_ui.py --list
-python tools/simulate_ui.py --scenario spinner_lifecycle
 ```
 
 ## License

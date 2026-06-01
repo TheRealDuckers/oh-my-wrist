@@ -49,6 +49,25 @@ def _first_word(command: str) -> str:
     return parts[0] if parts else ""
 
 
+def _shell_label(command: str) -> str:
+    """Extract a meaningful display label from a shell command.
+
+    Skips leading ``cd …`` segments in compound commands so that
+    ``cd /repo && pytest -x`` shows "pytest" instead of "cd".
+    """
+    import re
+
+    segments = re.split(r"\s*(?:&&|;)\s*", command.strip())
+    non_cd = [s for s in segments if s and not re.match(r"^cd\s|^cd$", s)]
+    if non_cd:
+        return _first_word(non_cd[0])
+    if segments and segments[-1].strip().startswith("cd"):
+        target = segments[-1].strip().split()[1:]
+        if target:
+            return os.path.basename(target[-1].rstrip("/"))
+    return _first_word(command)
+
+
 def _utf8_truncate(text: str, max_bytes: int) -> str:
     """Truncate ``text`` so its UTF-8 encoding is at most ``max_bytes`` bytes.
 
@@ -81,7 +100,7 @@ def _classify(ev: CanonicalEvent) -> tuple[int, int, str]:
     if ce == "tool_start":
         if intent == "shell":
             cmd = label or meta.get("command", "")
-            return IconId.PLAY, FLAG_SPINNER, _first_word(cmd)
+            return IconId.PLAY, FLAG_SPINNER, _shell_label(cmd)
         if intent == "edit":
             return IconId.PENCIL, FLAG_SPINNER, _basename(path or label)
         if intent == "read":
@@ -132,7 +151,7 @@ def _classify(ev: CanonicalEvent) -> tuple[int, int, str]:
 
     if ce == "command":
         cmd = label or meta.get("command", "")
-        return IconId.PLAY, FLAGS_NONE, _first_word(cmd)
+        return IconId.PLAY, FLAGS_NONE, _shell_label(cmd)
 
     if ce == "status":
         text = ev.status_text or label or ""

@@ -32,7 +32,51 @@ from loguru import logger
 # Claude Code hook configuration
 # ---------------------------------------------------------------------------
 
-_HOOK_COMMAND = "oh-my-wrist hook"
+
+def _ohm_command(subcommand: str) -> str:
+    """Return an absolute command string for invoking ``oh-my-wrist <subcommand>``.
+
+    Claude Code spawns hook and statusLine commands through a shell whose PATH
+    does **not** necessarily include the directory holding the ``oh-my-wrist``
+    console script — typically a project/virtualenv ``bin/`` that is only on
+    PATH when the venv is activated.  A bare ``oh-my-wrist`` therefore fails
+    with exit 127 (command not found) and the hook silently never runs.
+
+    We resolve an absolute command at install time instead:
+      1. the console script sitting next to the running interpreter, if present
+         (covers venv and pipx installs — the script lives in the same dir as
+         ``sys.executable``);
+      2. otherwise ``"<python>" -m ohm <subcommand>``, which only requires that
+         this same interpreter can import ``ohm`` (see ``ohm/__main__.py``).
+    """
+    script = Path(sys.executable).parent / (
+        "oh-my-wrist.exe" if sys.platform == "win32" else "oh-my-wrist"
+    )
+    if script.exists():
+        base = f'"{script}"' if " " in str(script) else str(script)
+    else:
+        py = f'"{sys.executable}"' if " " in sys.executable else sys.executable
+        base = f"{py} -m ohm"
+    return f"{base} {subcommand}"
+
+
+def _is_ohm_command(command: str | None, subcommand: str) -> bool:
+    """True if *command* invokes our *subcommand* in any install form.
+
+    Recognises the legacy bare ``oh-my-wrist hook``, the absolute
+    console-script path written by current installs, and the
+    ``<python> -m ohm hook`` fallback — so re-install heals stale entries and
+    uninstall removes entries written by older versions.
+    """
+    if not command:
+        return False
+    parts = command.split()
+    if not parts or parts[-1] != subcommand:
+        return False
+    return "oh-my-wrist" in command or "-m ohm" in command
+
+
+_HOOK_COMMAND = _ohm_command("hook")
 
 _HOOK_ENTRY = {"type": "command", "command": _HOOK_COMMAND, "async": True}
 
@@ -48,7 +92,7 @@ CLAUDE_SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 # statusLine integration — forwards /usage quota to the watch.  Unlike hooks
 # (a list), statusLine is single-valued, so we save any pre-existing command
 # and chain to it from our relay (see statusline_relay.py).
-_STATUSLINE_COMMAND = "oh-my-wrist statusline"
+_STATUSLINE_COMMAND = _ohm_command("statusline")
 _STATUSLINE_ENTRY = {"type": "command", "command": _STATUSLINE_COMMAND}
 _PREV_STATUSLINE_PATH = Path.home() / ".oh-my-wrist" / "prev_statusline"
 
@@ -118,10 +162,14 @@ def _atomic_write_text(path: Path, text: str) -> None:
 
 
 def _is_hook_present(hooks_list: list[dict]) -> bool:
-    """Return True if our hook command is already present in *hooks_list*."""
+    """Return True if an oh-my-wrist hook command is present in *hooks_list*.
+
+    Matches any install form (legacy bare command, absolute path, or the
+    ``-m ohm`` fallback) so re-install can prune and replace stale entries.
+    """
     for entry in hooks_list:
         for hook in entry.get("hooks", []):
-            if hook.get("command") == _HOOK_COMMAND:
+            if _is_ohm_command(hook.get("command"), "hook"):
                 return True
     return False
 
@@ -135,12 +183,17 @@ def patch_claude_settings() -> None:
 
     for event, entries in _HOOK_EVENTS.items():
         existing = hooks.setdefault(event, [])
-        if not _is_hook_present(existing):
-            existing.extend(entries)
+        # Prune any prior oh-my-wrist entries (legacy bare command or a stale
+        # absolute path from an older install) so re-running install heals the
+        # command path, then append the canonical entry exactly once.
+        pruned = [e for e in existing if not _is_hook_present([e])]
+        new_list = pruned + list(entries)
+        if new_list != existing:
+            hooks[event] = new_list
             changed = True
-            logger.info("Added hook for event '{}'", event)
+            logger.info("Configured oh-my-wrist hook for event '{}'", event)
         else:
-            logger.info("Hook for event '{}' already present — skipping", event)
+            logger.info("Hook for event '{}' already current — skipping", event)
 
     if changed:
         _atomic_write_json(CLAUDE_SETTINGS_PATH, settings)
@@ -196,14 +249,24 @@ def patch_claude_statusline() -> None:
     """
     settings = _load_claude_settings()
     existing = settings.get("statusLine")
+    existing_cmd = existing.get("command") if isinstance(existing, dict) else None
 
-    if isinstance(existing, dict) and existing.get("command") == _STATUSLINE_COMMAND:
+    if existing_cmd == _STATUSLINE_COMMAND:
         logger.info("statusLine already configured — skipping")
         return
 
+    # An older oh-my-wrist install (bare command or stale absolute path) is
+    # ours, not the user's: upgrade it in place without saving it as the
+    # "previous" command to restore on uninstall.
+    if _is_ohm_command(existing_cmd, "statusline"):
+        settings["statusLine"] = dict(_STATUSLINE_ENTRY)
+        _atomic_write_json(CLAUDE_SETTINGS_PATH, settings)
+        logger.info("Upgraded oh-my-wrist statusLine to an absolute command")
+        return
+
     # Preserve the user's prior statusLine command for chaining.
-    if isinstance(existing, dict) and isinstance(existing.get("command"), str):
-        _atomic_write_text(_PREV_STATUSLINE_PATH, existing["command"])
+    if isinstance(existing_cmd, str):
+        _atomic_write_text(_PREV_STATUSLINE_PATH, existing_cmd)
         logger.info("Saved existing statusLine for chaining")
 
     settings["statusLine"] = dict(_STATUSLINE_ENTRY)
@@ -215,9 +278,10 @@ def remove_claude_statusline() -> None:
     """Restore the saved statusLine (or remove ours) and clear the saved copy."""
     settings = _load_claude_settings()
     current = settings.get("statusLine")
+    current_cmd = current.get("command") if isinstance(current, dict) else None
 
-    # Only touch the setting if it is ours.
-    if isinstance(current, dict) and current.get("command") == _STATUSLINE_COMMAND:
+    # Only touch the setting if it is ours (any install form).
+    if _is_ohm_command(current_cmd, "statusline"):
         if _PREV_STATUSLINE_PATH.exists():
             prev = _PREV_STATUSLINE_PATH.read_text(encoding="utf-8").strip()
             settings["statusLine"] = {"type": "command", "command": prev}
