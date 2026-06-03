@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -34,6 +36,27 @@ from pydantic import BaseModel, Field
 # GATT Service UUID (custom 128-bit). Must match the Garmin Connect IQ
 # app's OHM_SERVICE_UUID constant in BleManager.mc.
 OHM_SERVICE_UUID = "0FA155B0-0C21-723A-970C-9821F1C5FFAB"
+
+# Optional user-selected connection discriminator. ID 0 preserves the shipped
+# service UUID; non-zero IDs derive a unique service UUID so nearby users do not
+# pair with each other's daemons during the scan phase.
+CONNECTION_ID_MIN = 0
+CONNECTION_ID_MAX = 255
+_SERVICE_UUID_CONNECTION_ID_BASE = 0x55
+
+
+def service_uuid_for_connection_id(connection_id: int) -> str:
+    """Return the advertised OHM service UUID for a connection ID.
+
+    The UUID shape stays close to the default service UUID while varying one
+    byte of the first segment. The transform is bijective for 0..255, and ID 0
+    maps exactly to ``OHM_SERVICE_UUID`` for backward-compatible default use.
+    """
+    if not CONNECTION_ID_MIN <= connection_id <= CONNECTION_ID_MAX:
+        raise ValueError("connection_id must be in 0..255")
+    discriminator = (_SERVICE_UUID_CONNECTION_ID_BASE + connection_id) & 0xFF
+    return f"0FA1{discriminator:02X}B0-0C21-723A-970C-9821F1C5FFAB"
+
 
 # Characteristic: per-event history frame (binary, max MAX_FRAME_LEN bytes,
 # notifiable).  See HISTORY PROTOCOL below.  The watch maintains the history
@@ -97,7 +120,13 @@ ALERT_AGENT_DONE = 0x04
 # IPC socket / named-pipe paths
 # ---------------------------------------------------------------------------
 
-SOCKET_PATH = "/tmp/ohm.sock"
+
+def _default_unix_socket_path() -> str:
+    uid = os.getuid() if hasattr(os, "getuid") else os.getpid()
+    return str(Path("/tmp") / f"oh-my-wrist-{uid}" / "ohm.sock")
+
+
+SOCKET_PATH = _default_unix_socket_path()
 NAMED_PIPE_PATH = r"\\.\pipe\ohm"
 
 # Resolve at import time which backend to use

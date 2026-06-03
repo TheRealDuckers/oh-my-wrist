@@ -27,6 +27,8 @@ class OhMyWristApp extends Application.AppBase {
     function onStart(state) {
         // Initialise the status model with default values.
         StatusModel.initialize();
+        ConnectionIdModel.initialize();
+        refreshOhmServiceUuid();
         // StatsModel fields are module-level vars; no explicit init needed.
 
         // Create and register the BLE delegate.

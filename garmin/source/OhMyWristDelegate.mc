@@ -22,6 +22,30 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
         _viewIndex = viewIndex;
     }
 
+    // SELECT / START opens the app menu on button watches. MENU does the same
+    // on devices with a dedicated menu behavior.
+    function onSelect() {
+        return _openMenu();
+    }
+
+    function onMenu() {
+        return _openMenu();
+    }
+
+    function _openMenu() {
+        var menu = new WatchUi.Menu2({ :title => "Oh-My-Wrist" });
+        menu.addItem(
+            new WatchUi.MenuItem(
+                "Set id",
+                "current " + ConnectionIdModel.getId(),
+                "set_id",
+                {}
+            )
+        );
+        WatchUi.pushView(menu, new OhMyWristMenuDelegate(), WatchUi.SLIDE_UP);
+        return true;
+    }
+
     // Swipe left / DOWN button — advance to the next view.
     function onNextPage() {
         if (_viewIndex >= 3) {
@@ -67,5 +91,26 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
             );
         }
         return new OhMyWristView();
+    }
+}
+
+class OhMyWristMenuDelegate extends WatchUi.Menu2InputDelegate {
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    function onSelect(item) {
+        if (item != null && item.getId() == "set_id") {
+            var view = new ConnectionIdView();
+            WatchUi.pushView(
+                view,
+                new ConnectionIdDelegate(view),
+                WatchUi.SLIDE_LEFT
+            );
+        }
+    }
+
+    function onBack() {
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 }

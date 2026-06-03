@@ -27,6 +27,7 @@ from ohm.protocol import (
     STATS_OPENCODE_CHAR_UUID,
     decode_message,
     encode_message,
+    service_uuid_for_connection_id,
 )
 
 # RFC 4122 UUID pattern (case-insensitive)
@@ -56,6 +57,23 @@ class TestUuidConstants:
     @pytest.mark.parametrize("uuid", _ALL_UUIDS)
     def test_uuid_128_bit(self, uuid):
         assert len(uuid.replace("-", "")) == 32
+
+    def test_connection_id_zero_preserves_default_service_uuid(self):
+        assert service_uuid_for_connection_id(0) == OHM_SERVICE_UUID
+
+    def test_connection_id_service_uuids_are_unique(self):
+        uuids = {service_uuid_for_connection_id(i).upper() for i in range(256)}
+        assert len(uuids) == 256
+
+    @pytest.mark.parametrize("connection_id", [0, 1, 42, 255])
+    def test_connection_id_service_uuid_format(self, connection_id):
+        uuid = service_uuid_for_connection_id(connection_id)
+        assert _UUID_RE.match(uuid)
+
+    @pytest.mark.parametrize("connection_id", [-1, 256])
+    def test_connection_id_service_uuid_rejects_out_of_range(self, connection_id):
+        with pytest.raises(ValueError):
+            service_uuid_for_connection_id(connection_id)
 
 
 class TestHistoryProtocolConstants:

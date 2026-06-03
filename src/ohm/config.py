@@ -9,7 +9,8 @@ Schema
 {
   "haptic_enabled": true,
   "quiet_start": "22:00",
-  "quiet_end": "08:00"
+  "quiet_end": "08:00",
+  "connection_id": 0
 }
 
 Quiet-hours logic
@@ -22,8 +23,10 @@ quiet window is treated as disabled (never quiet).
 from __future__ import annotations
 
 import json
-import tempfile
 import os
+import secrets
+import tempfile
+import time
 from datetime import datetime, time as dtime
 from pathlib import Path
 from typing import Optional
@@ -43,7 +46,32 @@ _DEFAULTS: dict = {
     "haptic_enabled": True,
     "quiet_start": "22:00",
     "quiet_end": "08:00",
+    "connection_id": 0,
 }
+
+
+def _ensure_private_config_dir() -> None:
+    """Create the config directory with user-only permissions where supported."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if os.name == "posix":
+        os.chmod(CONFIG_DIR, 0o700)
+
+
+def _chmod_private_file(path: Path | str) -> None:
+    """Best-effort user-only file permissions on POSIX platforms."""
+    if os.name == "posix":
+        os.chmod(path, 0o600)
+
+
+def _coerce_connection_id(value: object) -> int:
+    """Return a valid 0..255 connection ID, falling back to the default."""
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return _DEFAULTS["connection_id"]
+    if 0 <= n <= 255:
+        return n
+    return _DEFAULTS["connection_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +88,9 @@ class Config:
         )
         self.quiet_start: str = str(data.get("quiet_start", _DEFAULTS["quiet_start"]))
         self.quiet_end: str = str(data.get("quiet_end", _DEFAULTS["quiet_end"]))
+        self.connection_id: int = _coerce_connection_id(
+            data.get("connection_id", _DEFAULTS["connection_id"])
+        )
 
     # ------------------------------------------------------------------
     # Quiet-hours helpers
@@ -108,13 +139,15 @@ class Config:
             "haptic_enabled": self.haptic_enabled,
             "quiet_start": self.quiet_start,
             "quiet_end": self.quiet_end,
+            "connection_id": self.connection_id,
         }
 
     def __repr__(self) -> str:
         return (
             f"Config(haptic_enabled={self.haptic_enabled!r}, "
             f"quiet_start={self.quiet_start!r}, "
-            f"quiet_end={self.quiet_end!r})"
+            f"quiet_end={self.quiet_end!r}, "
+            f"connection_id={self.connection_id!r})"
         )
 
 
@@ -139,20 +172,82 @@ def load_config() -> Config:
 
 def save_config(cfg: Config) -> None:
     """Atomically write *cfg* to disk."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_private_config_dir()
     data = json.dumps(cfg.to_dict(), indent=2) + "\n"
     # Atomic write via temp file + rename
     fd, tmp = tempfile.mkstemp(dir=CONFIG_DIR, prefix=".config_", suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(data)
+        _chmod_private_file(tmp)
         os.replace(tmp, CONFIG_PATH)
+        _chmod_private_file(CONFIG_PATH)
     except Exception:
         try:
             os.unlink(tmp)
         except OSError:
             pass
         raise
+
+
+def get_control_token() -> str:
+    """Return a per-user token required for daemon control IPC messages."""
+    token_path = CONFIG_DIR / "control.token"
+    lock_path = CONFIG_DIR / ".control.token.lock"
+    _ensure_private_config_dir()
+
+    while True:
+        try:
+            token = token_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            token = ""
+        if token:
+            _chmod_private_file(token_path)
+            return token
+
+        try:
+            lock_fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(lock_fd)
+            break
+        except FileExistsError:
+            try:
+                # Recover from a writer that crashed while holding the lock.
+                if time.time() - lock_path.stat().st_mtime > 5:
+                    lock_path.unlink()
+            except FileNotFoundError:
+                pass
+            time.sleep(0.01)
+            continue
+
+    try:
+        try:
+            token = token_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            token = ""
+        if token:
+            _chmod_private_file(token_path)
+            return token
+
+        token = secrets.token_urlsafe(32)
+        fd, tmp = tempfile.mkstemp(dir=CONFIG_DIR, prefix=".control_", suffix=".token")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(token + "\n")
+            _chmod_private_file(tmp)
+            os.replace(tmp, token_path)
+            _chmod_private_file(token_path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        return token
+    finally:
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
 
 
 def set_haptic(enabled: bool) -> Config:
@@ -175,5 +270,15 @@ def set_quiet_end(hhmm: str) -> Config:
     """Set quiet-hours end time (HH:MM) and persist."""
     cfg = load_config()
     cfg.quiet_end = hhmm
+    save_config(cfg)
+    return cfg
+
+
+def set_connection_id(connection_id: int) -> Config:
+    """Set the BLE connection ID (0..255) and persist."""
+    if not 0 <= connection_id <= 255:
+        raise ValueError("connection_id must be in 0..255")
+    cfg = load_config()
+    cfg.connection_id = connection_id
     save_config(cfg)
     return cfg
