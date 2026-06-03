@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/logo.png" alt="Oh-My-Wrist Logo" width="600"/>
+  <img src="static/ohw_logo_transparent.png" alt="Oh-My-Wrist Logo" width="240"/>
 </p>
 
 <h1 align="center">Oh-My-Wrist</h1>

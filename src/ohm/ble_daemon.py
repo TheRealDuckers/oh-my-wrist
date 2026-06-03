@@ -265,7 +265,7 @@ class BleDaemon:
     async def _setup_ble(self) -> None:
         """Initialise bless server and register the GATT service."""
         loop = asyncio.get_event_loop()
-        self._server = BlessServer(name="OHM", loop=loop)
+        self._server = BlessServer(name="OHW", loop=loop)
         self._server.read_request_func = self._handle_read
         self._server.write_request_func = self._handle_write
 
@@ -333,7 +333,7 @@ class BleDaemon:
 
         await self._server.start()
         logger.info(
-            "BLE peripheral advertising as 'OHM' (service {})", OHM_SERVICE_UUID
+            "BLE peripheral advertising as 'OHW' (service {})", OHM_SERVICE_UUID
         )
 
         # On Linux, install our StartNotify hook now that .app exists.

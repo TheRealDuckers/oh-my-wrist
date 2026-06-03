@@ -6,6 +6,9 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 
+# Garmin build output
+build/
+
 # Node dependencies
 .opencode/node_modules/
 node_modules/
