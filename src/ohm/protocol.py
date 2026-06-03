@@ -24,7 +24,7 @@ import json
 import os
 import sys
 import time
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -122,8 +122,9 @@ ALERT_AGENT_DONE = 0x04
 
 
 def _default_unix_socket_path() -> str:
+    """Return the Unix-socket path using POSIX separators on every host."""
     uid = os.getuid() if hasattr(os, "getuid") else os.getpid()
-    return str(Path("/tmp") / f"oh-my-wrist-{uid}" / "ohm.sock")
+    return str(PurePosixPath("/tmp") / f"oh-my-wrist-{uid}" / "ohm.sock")
 
 
 SOCKET_PATH = _default_unix_socket_path()
