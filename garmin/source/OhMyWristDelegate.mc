@@ -104,7 +104,7 @@ class OhMyWristMenuDelegate extends WatchUi.Menu2InputDelegate {
             var view = new ConnectionIdView();
             WatchUi.pushView(
                 view,
-                new ConnectionIdDelegate(view),
+                new ConnectionIdDelegate(view, item),
                 WatchUi.SLIDE_LEFT
             );
         }

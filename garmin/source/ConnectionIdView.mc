@@ -109,10 +109,12 @@ class ConnectionIdView extends WatchUi.View {
 
 class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
     var _view;
+    var _menuItem;
 
-    function initialize(view) {
+    function initialize(view, menuItem) {
         BehaviorDelegate.initialize();
         _view = view;
+        _menuItem = menuItem;
     }
 
     function onKey(evt) {
@@ -129,7 +131,7 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
         }
 
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            _view.save();
+            _saveAndRefreshMenu();
             return true;
         }
 
@@ -162,12 +164,20 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() {
-        _view.save();
+        _saveAndRefreshMenu();
         return true;
     }
 
     function onBack() {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
         return true;
+    }
+
+    function _saveAndRefreshMenu() {
+        _view.save();
+        if (_menuItem != null) {
+            _menuItem.setSubLabel("current " + ConnectionIdModel.getId());
+            WatchUi.requestUpdate();
+        }
     }
 }
