@@ -10,7 +10,12 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from enum import IntFlag
+import importlib
+import sys
+import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 from ohm.icons import FLAG_SPINNER, IconId
@@ -58,6 +63,52 @@ def _ev(canonical: str, **kwargs) -> CanonicalEvent:
 
 
 class TestPushEvent:
+    def test_setup_ble_advertises_as_ohw(self):
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock()
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+        fake_bless = types.SimpleNamespace(
+            BlessServer=bless_server,
+            BlessGATTCharacteristic=MagicMock(),
+            GATTCharacteristicProperties=_Properties,
+            GATTAttributePermissions=_Permissions,
+        )
+        fake_loguru = types.SimpleNamespace(logger=MagicMock())
+
+        async def _run():
+            ble_daemon = sys.modules.get("ohm.ble_daemon")
+            if ble_daemon is None:
+                try:
+                    ble_daemon = importlib.import_module("ohm.ble_daemon")
+                except ModuleNotFoundError as exc:
+                    if exc.name not in {"bless", "loguru"}:
+                        raise
+                    with patch.dict(
+                        sys.modules, {"bless": fake_bless, "loguru": fake_loguru}
+                    ):
+                        ble_daemon = importlib.import_module("ohm.ble_daemon")
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                daemon = ble_daemon.BleDaemon()
+                await daemon._setup_ble()
+
+            assert bless_server.call_args.kwargs["name"] == "OHW"
+
+        asyncio.run(_run())
+
     def test_history_characteristic_updated(self):
         daemon, mock_server, _ = _make_daemon()
         daemon._push_event(_ev("tool_start", tool_name="Bash", label="pytest"))
