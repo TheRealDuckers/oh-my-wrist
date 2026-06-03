@@ -1,5 +1,6 @@
 // ConnectionIdView.mc — Small on-watch editor for the BLE connection ID.
 
+using Toybox.Application;
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
@@ -86,7 +87,21 @@ class ConnectionIdView extends WatchUi.View {
     }
 
     function save() {
-        ConnectionIdModel.setId(_value);
+        var applied = false;
+        var app = Application.getApp();
+
+        if (app != null && app.bleDelegate != null) {
+            try {
+                applied = app.bleDelegate.applyConnectionId(_value);
+            } catch (e) {
+                applied = false;
+            }
+        }
+
+        if (!applied || ConnectionIdModel.getId() != _value) {
+            ConnectionIdModel.setId(_value);
+        }
+
         _saved = true;
         WatchUi.requestUpdate();
     }
@@ -98,6 +113,32 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
     function initialize(view) {
         BehaviorDelegate.initialize();
         _view = view;
+    }
+
+    function onKey(evt) {
+        var key = evt.getKey();
+
+        if (key == WatchUi.KEY_UP) {
+            _view.adjust(-1);
+            return true;
+        }
+
+        if (key == WatchUi.KEY_DOWN) {
+            _view.adjust(1);
+            return true;
+        }
+
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            _view.save();
+            return true;
+        }
+
+        if (key == WatchUi.KEY_ESC) {
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return true;
+        }
+
+        return false;
     }
 
     function onNextPage() {

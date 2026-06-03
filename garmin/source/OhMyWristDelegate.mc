@@ -100,7 +100,7 @@ class OhMyWristMenuDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onSelect(item) {
-        if (item != null && item.getId() == "set_id") {
+        if (item != null && item.getId().equals("set_id")) {
             var view = new ConnectionIdView();
             WatchUi.pushView(
                 view,
