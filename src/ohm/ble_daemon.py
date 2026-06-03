@@ -43,6 +43,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import signal
 import sys
 from pathlib import Path
@@ -66,7 +67,7 @@ else:
     )  # type: ignore[import]
 from loguru import logger
 
-from ohm.config import load_config
+from ohm.config import get_control_token, load_config
 from ohm.history_encoder import encode_event
 from ohm.protocol import (
     ALERT_CHAR_UUID,
@@ -85,6 +86,7 @@ from ohm.protocol import (
     STATS_OPENCODE_CHAR_UUID,
     USAGE_CHAR_UUID,
     decode_message,
+    service_uuid_for_connection_id,
 )
 from ohm.provider_types import CanonicalEvent
 from ohm.session_state import MultiProviderSessionState
@@ -209,6 +211,19 @@ def _clamp_pct(value: object) -> int:
     return max(-1, min(100, n))
 
 
+def _control_token_valid(meta: dict[str, Any] | None) -> bool:
+    """Return True when a daemon control message carries the local token."""
+    token = (meta or {}).get("control_token")
+    if not isinstance(token, str) or not token:
+        return False
+    try:
+        expected = get_control_token()
+    except Exception as exc:
+        logger.warning("Could not load daemon control token: {}", exc)
+        return False
+    return secrets.compare_digest(token, expected)
+
+
 # ---------------------------------------------------------------------------
 # BLE Daemon
 # ---------------------------------------------------------------------------
@@ -219,6 +234,8 @@ class BleDaemon:
 
     def __init__(self) -> None:
         self._server: BlessServer | None = None
+        self._connection_id: int = 0
+        self._service_uuid: str = OHM_SERVICE_UUID
         self._last_frame: bytes = b""
         self._session_active: bytes = b"\x00"
         self._current_alert: bytes = b"\x00"
@@ -235,6 +252,7 @@ class BleDaemon:
         # Async queue serializing all BLE notifications with inter-notification
         # spacing to avoid overwhelming the watch BLE stack.
         self._notify_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+        self._ble_restart_lock = asyncio.Lock()
         # Deferred post-subscribe push: fires once 1.5s after the *last*
         # CCCD subscribe arrives, giving the watch time to finish all CCCD
         # writes and transition to PHASE_READY before any notifications land.
@@ -262,12 +280,20 @@ class BleDaemon:
     # BLE setup
     # ------------------------------------------------------------------
 
-    async def _setup_ble(self) -> None:
+    async def _setup_ble(self, connection_id: int | None = None) -> None:
         """Initialise bless server and register the GATT service."""
+        cfg = load_config()
+        old_connection_id = self._connection_id
+        old_service_uuid = self._service_uuid
+        target_connection_id = (
+            cfg.connection_id if connection_id is None else connection_id
+        )
+        target_service_uuid = service_uuid_for_connection_id(target_connection_id)
+
         loop = asyncio.get_event_loop()
-        self._server = BlessServer(name="OHW", loop=loop)
-        self._server.read_request_func = self._handle_read
-        self._server.write_request_func = self._handle_write
+        server = BlessServer(name="OHW", loop=loop)
+        server.read_request_func = self._handle_read
+        server.write_request_func = self._handle_write
 
         # On Linux/BlueZ, CCCD subscribes (StartNotify) are handled internally
         # by bless via D-Bus and never reach _handle_write. Hook into the
@@ -275,13 +301,13 @@ class BleDaemon:
         if sys.platform == "linux":
             self._hook_bluez_start_notify()
 
-        await self._server.add_new_service(OHM_SERVICE_UUID)
+        await server.add_new_service(target_service_uuid)
 
         # HISTORY characteristic — Read + Notify.  Each notification is one
         # binary frame (≤ MAX_FRAME_LEN bytes).  The watch maintains the
         # history deque locally.
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             HISTORY_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._last_frame,
@@ -289,8 +315,8 @@ class BleDaemon:
         )
 
         # SESSION characteristic — Read only
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             SESSION_CHAR_UUID,
             GATTCharacteristicProperties.read,
             self._session_active,
@@ -298,8 +324,8 @@ class BleDaemon:
         )
 
         # ALERT characteristic — Read + Notify
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             ALERT_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._current_alert,
@@ -307,15 +333,15 @@ class BleDaemon:
         )
 
         # Per-provider STATS characteristics — Read + Notify
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             STATS_CLAUDE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._multi.payload_for("claude"),
             GATTAttributePermissions.readable,
         )
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             STATS_OPENCODE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._multi.payload_for("opencode"),
@@ -323,42 +349,66 @@ class BleDaemon:
         )
 
         # USAGE characteristic — Read + Notify (Claude quota bars)
-        await self._server.add_new_characteristic(
-            OHM_SERVICE_UUID,
+        await server.add_new_characteristic(
+            target_service_uuid,
             USAGE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
             self._usage_payload(),
             GATTAttributePermissions.readable,
         )
 
-        await self._server.start()
-        logger.info(
-            "BLE peripheral advertising as 'OHW' (service {})", OHM_SERVICE_UUID
-        )
+        try:
+            await server.start()
+            self._server = server
+            self._connection_id = target_connection_id
+            self._service_uuid = target_service_uuid
+            logger.info(
+                "BLE peripheral advertising as 'OHW' (connection_id={}, service {})",
+                self._connection_id,
+                self._service_uuid,
+            )
 
-        # On Linux, install our StartNotify hook now that .app exists.
-        if sys.platform == "linux" and hasattr(self, "_bluez_start_notify_hook"):
+            # On Linux, install our StartNotify hook now that .app exists.
+            if sys.platform == "linux" and hasattr(self, "_bluez_start_notify_hook"):
+                try:
+                    server.app.StartNotify = self._bluez_start_notify_hook
+                    logger.info("BlueZ StartNotify hook installed")
+                except Exception as exc:
+                    logger.warning("Failed to install StartNotify hook: {}", exc)
+
+            # On Linux, set a faster advertising interval (~500ms instead of default 1.28s)
+            if sys.platform == "linux":
+                await self._set_advertising_interval()
+
+            # On Linux, ensure BlueZ adapter accepts incoming BLE connections
+            if (
+                sys.platform == "linux"
+                and self._agent_bus is None
+                and self._agent_process is None
+            ):
+                await self._ensure_bluez_pairable()
+
+            # On Windows, clear stale OS-level BLE bonds so a re-launched watch
+            # app can pair from a clean slate (see _remove_stale_windows_bonds).
+            if sys.platform == "win32":
+                await self._remove_stale_windows_bonds()
+
+            # Log adapter state for diagnostics
+            await self._log_ble_diagnostics()
+        except Exception:
+            if self._server is server:
+                self._server = None
+            self._connection_id = old_connection_id
+            self._service_uuid = old_service_uuid
             try:
-                self._server.app.StartNotify = self._bluez_start_notify_hook
-                logger.info("BlueZ StartNotify hook installed")
-            except Exception as exc:
-                logger.warning("Failed to install StartNotify hook: {}", exc)
-
-        # On Linux, set a faster advertising interval (~500ms instead of default 1.28s)
-        if sys.platform == "linux":
-            await self._set_advertising_interval()
-
-        # On Linux, ensure BlueZ adapter accepts incoming BLE connections
-        if sys.platform == "linux":
-            await self._ensure_bluez_pairable()
-
-        # On Windows, clear stale OS-level BLE bonds so a re-launched watch
-        # app can pair from a clean slate (see _remove_stale_windows_bonds).
-        if sys.platform == "win32":
-            await self._remove_stale_windows_bonds()
-
-        # Log adapter state for diagnostics
-        await self._log_ble_diagnostics()
+                result = server.stop()
+                if hasattr(result, "__await__"):
+                    await result
+            except Exception as cleanup_exc:
+                logger.warning(
+                    "Failed to stop partially-started BLE server: {}", cleanup_exc
+                )
+            raise
 
     def _hook_bluez_start_notify(self) -> None:
         """Replace bless's no-op StartNotify with a hook that sets _has_subscribers.
@@ -722,6 +772,84 @@ class BleDaemon:
                         logger.info("BlueZ adapter: {}", line)
             except Exception as exc:
                 logger.debug("bluetoothctl diagnostics failed: {}", exc)
+
+    def _clear_notify_queue(self) -> None:
+        """Drop pending notifications that target a now-stopped GATT service."""
+        while True:
+            try:
+                self._notify_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+
+    async def _apply_connection_id(self, connection_id: int) -> None:
+        """Restart BLE advertising with the service UUID for ``connection_id``."""
+        try:
+            new_service_uuid = service_uuid_for_connection_id(connection_id)
+        except ValueError as exc:
+            logger.warning("Ignoring invalid connection_id update: {}", exc)
+            return
+
+        async with self._ble_restart_lock:
+            if connection_id == self._connection_id and self._server is not None:
+                logger.debug("Connection ID already {}; no BLE restart", connection_id)
+                return
+
+            old_server = self._server
+            old_connection_id = self._connection_id
+            old_service_uuid = self._service_uuid
+            logger.info(
+                "Applying connection ID change: {} ({}) -> {} ({})",
+                old_connection_id,
+                old_service_uuid,
+                connection_id,
+                new_service_uuid,
+            )
+
+            if self._deferred_push_handle is not None:
+                self._deferred_push_handle.cancel()
+                self._deferred_push_handle = None
+
+            self._server = None
+            self._device_connected = False
+            self._has_subscribers = False
+            self._subscribe_settling = False
+            self._clear_notify_queue()
+
+            if old_server is not None:
+                try:
+                    result = old_server.stop()
+                    if hasattr(result, "__await__"):
+                        await result
+                except Exception as exc:
+                    logger.warning("Failed to stop BLE server for ID change: {}", exc)
+
+            try:
+                await self._setup_ble(connection_id=connection_id)
+                logger.info("Connection ID {} is now active", connection_id)
+            except Exception as exc:
+                logger.exception(
+                    "Failed to restart BLE server for connection ID {}: {}",
+                    connection_id,
+                    exc,
+                )
+                self._server = None
+                self._connection_id = old_connection_id
+                self._service_uuid = old_service_uuid
+                try:
+                    await self._setup_ble(connection_id=old_connection_id)
+                    logger.warning(
+                        "Rolled BLE advertising back to connection ID {}",
+                        old_connection_id,
+                    )
+                except Exception as rollback_exc:
+                    self._server = None
+                    self._connection_id = old_connection_id
+                    self._service_uuid = old_service_uuid
+                    logger.exception(
+                        "Failed to roll BLE advertising back to connection ID {}: {}",
+                        old_connection_id,
+                        rollback_exc,
+                    )
 
     # ------------------------------------------------------------------
     # Connection monitor — fast-poll for connection state changes
@@ -1118,7 +1246,7 @@ class BleDaemon:
         """
         if not self._device_connected or not self._has_subscribers:
             return
-        self._notify_queue.put_nowait((OHM_SERVICE_UUID, char_uuid))
+        self._notify_queue.put_nowait((self._service_uuid, char_uuid))
 
     @staticmethod
     def _char_name(uuid: str) -> str:
@@ -1536,6 +1664,23 @@ class BleDaemon:
             msg.canonical_event if isinstance(msg, CanonicalIpcMessage) else msg.event
         )
 
+        # Daemon control message from `oh-my-wrist set-id`. This is not an AI
+        # activity event, so it must not reach session state or HISTORY.
+        if (
+            isinstance(msg, CanonicalIpcMessage)
+            and msg.canonical_event == "config_update"
+        ):
+            if not _control_token_valid(msg.meta):
+                logger.warning("Ignoring unauthorized config_update")
+                return
+            try:
+                connection_id = int((msg.meta or {}).get("connection_id"))
+            except (TypeError, ValueError):
+                logger.warning("Ignoring config_update without valid connection_id")
+                return
+            asyncio.ensure_future(self._apply_connection_id(connection_id))
+            return
+
         # Usage quota (from the Claude statusLine relay) is not a history
         # event: update the USAGE characteristic and return without touching
         # the session-state engine or the history frame.  Always intercepted
@@ -1610,14 +1755,25 @@ class BleDaemon:
             writer.close()
 
     async def _start_unix_server(self) -> asyncio.AbstractServer:
+        socket_path = Path(SOCKET_PATH)
+        socket_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if os.name == "posix":
+            os.chmod(socket_path.parent, 0o700)
         try:
-            os.unlink(SOCKET_PATH)
+            os.unlink(socket_path)
         except FileNotFoundError:
             pass
-        server = await asyncio.start_unix_server(
-            self._handle_unix_client,
-            path=SOCKET_PATH,
-        )
+        old_umask = os.umask(0o177) if os.name == "posix" else None
+        try:
+            server = await asyncio.start_unix_server(
+                self._handle_unix_client,
+                path=SOCKET_PATH,
+            )
+        finally:
+            if old_umask is not None:
+                os.umask(old_umask)
+        if os.name == "posix":
+            os.chmod(socket_path, 0o600)
         logger.info("IPC Unix socket listening at {}", SOCKET_PATH)
         return server
 

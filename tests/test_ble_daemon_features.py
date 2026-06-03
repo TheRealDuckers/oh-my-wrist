@@ -467,7 +467,8 @@ class TestKeepalive:
         mock_server.is_advertising = AsyncMock(return_value=False)
         mock_server.start = AsyncMock()
 
-        _run_one_keepalive_tick(daemon, max_ticks=1)
+        with patch("ohm.ble_daemon.sys.platform", "darwin"):
+            _run_one_keepalive_tick(daemon, max_ticks=1)
 
         mock_server.start.assert_awaited()
 
@@ -479,7 +480,8 @@ class TestKeepalive:
         mock_server.is_advertising = AsyncMock(return_value=True)
         mock_server.start = AsyncMock()
 
-        _run_one_keepalive_tick(daemon, max_ticks=1)
+        with patch("ohm.ble_daemon.sys.platform", "darwin"):
+            _run_one_keepalive_tick(daemon, max_ticks=1)
 
         mock_server.start.assert_not_awaited()
 

@@ -15,6 +15,7 @@ Covers
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 
@@ -53,8 +54,10 @@ class TestConstants:
         assert MAX_FRAME_LEN == 22
         assert MAX_FRAME_LEN == 4 + ENTRY_TEXT_MAX
 
-    def test_socket_path_is_tmp(self):
-        assert SOCKET_PATH.startswith("/tmp/")
+    def test_socket_path_is_user_private(self):
+        uid = os.getuid() if hasattr(os, "getuid") else os.getpid()
+        assert SOCKET_PATH.endswith(f"/oh-my-wrist-{uid}/ohm.sock")
+        assert SOCKET_PATH != "/tmp/ohm.sock"
 
     def test_named_pipe_path_prefix(self):
         # Actual value: '\\.\pipe\ohm'

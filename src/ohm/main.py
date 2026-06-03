@@ -12,6 +12,7 @@ Commands
   test        Send a test status string to simulate Claude Code activity
   logs        Tail the daemon log
   config      View or update haptic / quiet-hours configuration
+  set-id      Set the BLE connection ID used for daemon/watch matching
   opencode    OpenCode plugin management subcommands
 """
 
@@ -160,6 +161,11 @@ def status() -> None:
         click.echo(f"Daemon status : RUNNING (PID {pid})")
     else:
         click.echo("Daemon status : STOPPED")
+
+    from ohm.config import load_config
+
+    cfg = load_config()
+    click.echo(f"Connection ID : {cfg.connection_id}")
 
     from ohm.install import get_service_status
 
@@ -463,6 +469,50 @@ def config_cmd(
         click.echo(f"haptic_enabled : {cfg.haptic_enabled}")
         click.echo(f"quiet_start    : {cfg.quiet_start}")
         click.echo(f"quiet_end      : {cfg.quiet_end}")
+        click.echo(f"connection_id  : {cfg.connection_id}")
+
+
+# ---------------------------------------------------------------------------
+# set-id
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="set-id")
+@click.argument("connection_id", type=click.IntRange(0, 255))
+def set_id(connection_id: int) -> None:
+    """Set the BLE connection ID used to match daemon and watch."""
+    from ohm.config import get_control_token, set_connection_id
+    from ohm.protocol import CanonicalIpcMessage
+
+    cfg = set_connection_id(connection_id)
+    control_token = get_control_token()
+    click.echo(f"Connection ID: {cfg.connection_id}")
+
+    pid = _read_pid()
+    if pid is None or not _is_running(pid):
+        click.echo("Daemon is not running; ID will apply on next daemon start.")
+        return
+
+    msg = CanonicalIpcMessage(
+        provider="claude",
+        provider_event="oh-my-wrist.config",
+        canonical_event="config_update",
+        active=False,
+        meta={"connection_id": cfg.connection_id, "control_token": control_token},
+    )
+
+    async def _send() -> None:
+        await send_to_daemon(msg)
+
+    try:
+        asyncio.run(_send())
+        click.echo("Running daemon update queued.")
+    except Exception as exc:
+        click.echo(
+            "Saved, but failed to update running daemon "
+            f"({exc}); ID will apply on next daemon start.",
+            err=True,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -48,7 +48,8 @@ The daemon also writes its own log to `~/.oh-my-wrist/daemon.log`.
 
 ## IPC Transport
 
-On Linux the daemon listens on a Unix domain socket at `/tmp/ohm.sock`.
+On Linux the daemon listens on a private Unix domain socket at
+`/tmp/oh-my-wrist-<uid>/ohm.sock`.
 
 ## Troubleshooting
 

@@ -18,15 +18,25 @@
  */
 
 import * as net from "net";
+import * as os from "os";
+import * as path from "path";
 
 // ---------------------------------------------------------------------------
 // IPC transport
 // ---------------------------------------------------------------------------
 
 const IS_WINDOWS = process.platform === "win32";
+
+function unixSocketPath(): string {
+  const uid = typeof process.getuid === "function"
+    ? process.getuid()
+    : os.userInfo().uid;
+  return path.join("/tmp", `oh-my-wrist-${uid}`, "ohm.sock");
+}
+
 const SOCKET_PATH = IS_WINDOWS
   ? String.raw`\\.\pipe\ohm`
-  : "/tmp/ohm.sock";
+  : unixSocketPath();
 
 async function sendToDaemon(payload: object): Promise<void> {
   const json = JSON.stringify(payload) + "\n";
@@ -387,7 +397,7 @@ async function handleBusEvent(event: unknown): Promise<void> {
 // Plugin registration — named export per OpenCode plugin API
 // ---------------------------------------------------------------------------
 
-export const OhMyWristPlugin = async (_ctx: unknown) => {
+const OhMyWristPlugin = async (_ctx: unknown) => {
   return {
     "tool.execute.before": async (input: unknown, output: unknown) => {
       const inputRec = asRecord(input) ?? {};

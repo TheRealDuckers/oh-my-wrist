@@ -24,7 +24,7 @@ using Toybox.WatchUi;
 // UUID constants — must match protocol.py
 // ---------------------------------------------------------------------------
 
-var OHM_SERVICE_UUID = BLE.stringToUuid("0FA155B0-0C21-723A-970C-9821F1C5FFAB");
+var OHM_SERVICE_UUID = ConnectionIdModel.serviceUuidForCurrentId();
 var HISTORY_CHAR_UUID = BLE.stringToUuid(
     "0FA155B1-0C21-723A-970C-9821F1C5FFAB"
 );
@@ -39,6 +39,16 @@ var STATS_OPENCODE_CHAR_UUID = BLE.stringToUuid(
     "0FA155B5-0C21-723A-970C-9821F1C5FFAB"
 );
 var USAGE_CHAR_UUID = BLE.stringToUuid("0FA155B6-0C21-723A-970C-9821F1C5FFAB");
+
+function refreshOhmServiceUuid() {
+    OHM_SERVICE_UUID = ConnectionIdModel.serviceUuidForCurrentId();
+    System.println(
+        "BLE: using connection_id=" +
+            ConnectionIdModel.getId() +
+            " service=" +
+            ConnectionIdModel.serviceUuidStringForId(ConnectionIdModel.getId())
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Connection state-machine phases and watchdog budgets
@@ -238,6 +248,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     // _onDisconnected(), consumed by _onDisconnectDeferred().
     var _disconnectWasAborting;
 
+    // Pending connection ID selected from the settings UI. Applied after any
+    // current link is torn down so profile re-registration and rescan happen
+    // outside the BLE disconnect callback.
+    var _pendingConnectionId;
+
     // Two-phase scan collection state.
     // During PHASE_SCANNING, matching advertisements are accumulated in
     // _scanCollected for SCAN_COLLECT_MS before the best (highest RSSI)
@@ -272,6 +287,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         // on devices with low OS timer-slot limits.
         _opTimer = new Timer.Timer();
         _disconnectWasAborting = false;
+        _pendingConnectionId = null;
         _scanCollected = [];
         StatusModel.setPhase("scanning");
         _startWatchdog();
@@ -290,6 +306,35 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _opTimer.start(method(:initializeScan), delayMs, false);
     }
 
+    // Apply a new connection ID from the settings UI. If connected, disconnect
+    // first and let _onDisconnectDeferred perform the actual UUID switch.
+    function applyConnectionId(connectionId) {
+        if (connectionId == ConnectionIdModel.getId()) {
+            return true;
+        }
+        _pendingConnectionId = connectionId;
+        _scanCollected = [];
+
+        if (_aborting) {
+            System.println(
+                "BLE: connection ID change pending during existing abort"
+            );
+            return true;
+        }
+
+        if (_connectedDevice != null) {
+            System.println(
+                "BLE: connection ID change pending; aborting current link"
+            );
+            _abortToScanningExtended(false);
+            return true;
+        }
+
+        _opTimer.stop();
+        _applyPendingConnectionIdAndRescan();
+        return true;
+    }
+
     // Stop all BLE-related timers. Called by OhMyWristApp.onStop()
     // before any BLE teardown to prevent stale timer callbacks from
     // firing during or after widget shutdown.
@@ -303,6 +348,7 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
             _opTimer = null;
         }
         _scanCollected = [];
+        _pendingConnectionId = null;
     }
 
     // ------------------------------------------------------------------
@@ -542,8 +588,12 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                 _discoveryDevice = null;
                 StatusModel.setConnected(false);
                 _setPhase(PHASE_SCANNING);
-                _scheduleRescanExtended(isHardwareException);
                 _aborting = false;
+                if (_pendingConnectionId != null) {
+                    _applyPendingConnectionIdAndRescan();
+                    return;
+                }
+                _scheduleRescanExtended(isHardwareException);
             }
             return;
         }
@@ -554,8 +604,12 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         _discoveryDevice = null;
         StatusModel.setConnected(false);
         _setPhase(PHASE_SCANNING);
-        _scheduleRescanExtended(isHardwareException);
         _aborting = false;
+        if (_pendingConnectionId != null) {
+            _applyPendingConnectionIdAndRescan();
+            return;
+        }
+        _scheduleRescanExtended(isHardwareException);
     }
 
     function _scheduleRescanExtended(isHardwareException as Lang.Boolean) {
@@ -598,6 +652,10 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         StatusModel.setConnected(false);
         _setPhase(PHASE_SCANNING);
         _aborting = false;
+        if (_pendingConnectionId != null) {
+            _applyPendingConnectionIdAndRescan();
+            return;
+        }
         _scheduleRescanExtended(_abortSafetyIsHwEx);
     }
 
@@ -607,6 +665,57 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
     function _scheduleRescan() {
         _opTimer.stop();
         _opTimer.start(method(:restartScan), BLE_OP_SPACING_MS, false);
+    }
+
+    function _applyPendingConnectionIdAndRescan() as Void {
+        if (_pendingConnectionId == null) {
+            _scheduleRescan();
+            return;
+        }
+
+        var id = _pendingConnectionId;
+        _pendingConnectionId = null;
+
+        try {
+            BLE.setScanState(BLE.SCAN_STATE_OFF);
+        } catch (e) {
+            // Best effort: the next scheduled scan will reassert SCANNING.
+        }
+
+        ConnectionIdModel.setId(id);
+        refreshOhmServiceUuid();
+
+        try {
+            registerBleProfile();
+        } catch (e) {
+            System.println(
+                "BLE: registerProfile failed after connection ID change: " +
+                    e.getErrorMessage()
+            );
+            StatusModel.setPhase("error");
+            WatchUi.requestUpdate();
+            return;
+        }
+
+        _service = null;
+        _charHistory = null;
+        _charAlert = null;
+        _charStatsClaude = null;
+        _charStatsOpencode = null;
+        _charUsage = null;
+        _discoveryDevice = null;
+        _connectedDevice = null;
+        _pendingScanResult = null;
+        _subscribeQueue = [];
+        _scanCollected = [];
+        _discoveryAttempts = 0;
+        _currentSubscribingUuid = null;
+        _currentSubscribeStartTime = null;
+        _retriedCccds = {};
+        StatusModel.setConnected(false);
+        _setPhase(PHASE_SCANNING);
+        WatchUi.requestUpdate();
+        _scheduleRescan();
     }
 
     // Deferred unpair + rescan for the PHASE_CONNECTING timeout path.
@@ -649,6 +758,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
                     _phaseName(_phase) +
                     ")"
             );
+            return;
+        }
+
+        if (_pendingConnectionId != null) {
+            _applyPendingConnectionIdAndRescan();
             return;
         }
 
@@ -1265,6 +1379,11 @@ class OhMyWristBleDelegate extends BLE.BleDelegate {
         StatusModel.setConnected(false);
         _setPhase(PHASE_SCANNING);
         WatchUi.requestUpdate();
+
+        if (_pendingConnectionId != null) {
+            _applyPendingConnectionIdAndRescan();
+            return;
+        }
 
         // If disconnect was triggered by _abortToScanning (or stale-connect
         // cleanup), use the standard spaced rescan path.

@@ -17,6 +17,7 @@ import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 from ohm.icons import FLAG_SPINNER, IconId
 from ohm.protocol import (
@@ -24,6 +25,7 @@ from ohm.protocol import (
     HISTORY_CHAR_UUID,
     MAX_FRAME_LEN,
     PROTOCOL_VERSION,
+    service_uuid_for_connection_id,
 )
 from ohm.provider_types import CanonicalEvent
 
@@ -108,6 +110,177 @@ class TestPushEvent:
             assert bless_server.call_args.kwargs["name"] == "OHW"
 
         asyncio.run(_run())
+
+    def test_setup_ble_uses_configured_connection_id_service_uuid(self):
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock()
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+        expected_uuid = service_uuid_for_connection_id(42)
+
+        async def _run():
+            import ohm.ble_daemon as ble_daemon
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon, "GATTCharacteristicProperties", _Properties),
+                patch.object(ble_daemon, "GATTAttributePermissions", _Permissions),
+                patch.object(ble_daemon, "load_config") as load_config,
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                load_config.return_value = MagicMock(connection_id=42)
+                daemon = ble_daemon.BleDaemon()
+                await daemon._setup_ble()
+
+            mock_server.add_new_service.assert_awaited_once_with(expected_uuid)
+            assert mock_server.add_new_characteristic.await_args_list
+            assert all(
+                call.args[0] == expected_uuid
+                for call in mock_server.add_new_characteristic.await_args_list
+            )
+
+        asyncio.run(_run())
+
+    def test_setup_ble_failure_does_not_commit_new_connection_id(self):
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock(side_effect=RuntimeError("boom"))
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+
+        async def _run():
+            import ohm.ble_daemon as ble_daemon
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon, "GATTCharacteristicProperties", _Properties),
+                patch.object(ble_daemon, "GATTAttributePermissions", _Permissions),
+                patch.object(ble_daemon, "load_config") as load_config,
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                load_config.return_value = MagicMock(connection_id=42)
+                daemon = ble_daemon.BleDaemon()
+                daemon._connection_id = 7
+                daemon._service_uuid = service_uuid_for_connection_id(7)
+                try:
+                    await daemon._setup_ble()
+                except RuntimeError:
+                    pass
+                else:
+                    raise AssertionError("_setup_ble swallowed setup failure")
+
+            assert daemon._connection_id == 7
+            assert daemon._service_uuid == service_uuid_for_connection_id(7)
+
+        asyncio.run(_run())
+
+    def test_setup_ble_post_start_failure_stops_server_and_restores_id(self):
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock()
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock()
+        mock_server.stop = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+
+        async def _run():
+            import ohm.ble_daemon as ble_daemon
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon, "GATTCharacteristicProperties", _Properties),
+                patch.object(ble_daemon, "GATTAttributePermissions", _Permissions),
+                patch.object(ble_daemon, "load_config") as load_config,
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                load_config.return_value = MagicMock(connection_id=42)
+                daemon = ble_daemon.BleDaemon()
+                daemon._connection_id = 7
+                daemon._service_uuid = service_uuid_for_connection_id(7)
+                daemon._log_ble_diagnostics = AsyncMock(
+                    side_effect=RuntimeError("diag")
+                )
+                with pytest.raises(RuntimeError):
+                    await daemon._setup_ble()
+
+            mock_server.stop.assert_awaited_once()
+            assert daemon._server is None
+            assert daemon._connection_id == 7
+            assert daemon._service_uuid == service_uuid_for_connection_id(7)
+
+        asyncio.run(_run())
+
+    def test_setup_ble_start_failure_stops_server_and_restores_id(self):
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock()
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock(side_effect=RuntimeError("start"))
+        mock_server.stop = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+
+        async def _run():
+            import ohm.ble_daemon as ble_daemon
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon, "GATTCharacteristicProperties", _Properties),
+                patch.object(ble_daemon, "GATTAttributePermissions", _Permissions),
+                patch.object(ble_daemon, "load_config") as load_config,
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                load_config.return_value = MagicMock(connection_id=42)
+                daemon = ble_daemon.BleDaemon()
+                daemon._connection_id = 7
+                daemon._service_uuid = service_uuid_for_connection_id(7)
+                with pytest.raises(RuntimeError):
+                    await daemon._setup_ble()
+
+            mock_server.stop.assert_awaited_once()
+            assert daemon._server is None
+            assert daemon._connection_id == 7
+            assert daemon._service_uuid == service_uuid_for_connection_id(7)
+
+        asyncio.run(_run())
+
+    def test_enqueue_notify_uses_active_connection_id_service_uuid(self):
+        daemon, _, _ = _make_daemon()
+        daemon._service_uuid = service_uuid_for_connection_id(9)
+        daemon._enqueue_notify(HISTORY_CHAR_UUID)
+        service_uuid, char_uuid = daemon._notify_queue.get_nowait()
+        assert service_uuid == service_uuid_for_connection_id(9)
+        assert char_uuid == HISTORY_CHAR_UUID
 
     def test_history_characteristic_updated(self):
         daemon, mock_server, _ = _make_daemon()

@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -35,6 +35,7 @@ from ohm.protocol import (
     SOCKET_PATH,
     STATS_CLAUDE_CHAR_UUID,
     STATS_OPENCODE_CHAR_UUID,
+    service_uuid_for_connection_id,
 )
 from ohm.provider_types import CanonicalEvent
 
@@ -265,8 +266,10 @@ class TestCharacteristicReadHandler:
 
 
 class TestIpcSocketLifecycle:
-    def test_socket_path_constant(self):
-        assert SOCKET_PATH == "/tmp/ohm.sock"
+    def test_socket_path_is_user_private(self):
+        uid = os.getuid() if hasattr(os, "getuid") else os.getpid()
+        assert SOCKET_PATH.endswith(f"/oh-my-wrist-{uid}/ohm.sock")
+        assert SOCKET_PATH != "/tmp/ohm.sock"
 
     def test_stale_socket_file_removed_on_startup(self):
         import tempfile
@@ -293,6 +296,96 @@ class TestIpcSocketLifecycle:
 
 
 class TestIpcMessageHandling:
+    def test_config_update_requires_control_token(self):
+        from ohm.protocol import CanonicalIpcMessage
+
+        daemon, _ = _make_daemon()
+        daemon._apply_connection_id = MagicMock()
+        msg = CanonicalIpcMessage(
+            provider="claude",
+            provider_event="oh-my-wrist.config",
+            canonical_event="config_update",
+            active=False,
+            meta={"connection_id": 42},
+        )
+
+        with (
+            patch("ohm.ble_daemon.asyncio.ensure_future") as ensure_future,
+            patch("ohm.ble_daemon.get_control_token", return_value="secret"),
+        ):
+            daemon._process_ipc_message(msg)
+
+        daemon._apply_connection_id.assert_not_called()
+        ensure_future.assert_not_called()
+        assert daemon._last_frame == b""
+
+    def test_config_update_schedules_connection_id_apply_with_valid_token(self):
+        from ohm.protocol import CanonicalIpcMessage
+
+        daemon, _ = _make_daemon()
+        apply_result = object()
+        daemon._apply_connection_id = MagicMock(return_value=apply_result)
+        msg = CanonicalIpcMessage(
+            provider="claude",
+            provider_event="oh-my-wrist.config",
+            canonical_event="config_update",
+            active=False,
+            meta={"connection_id": 42, "control_token": "secret"},
+        )
+
+        with (
+            patch("ohm.ble_daemon.asyncio.ensure_future") as ensure_future,
+            patch("ohm.ble_daemon.get_control_token", return_value="secret"),
+        ):
+            daemon._process_ipc_message(msg)
+
+        daemon._apply_connection_id.assert_called_once_with(42)
+        ensure_future.assert_called_once_with(apply_result)
+        assert daemon._last_frame == b""
+
+    @pytest.mark.asyncio
+    async def test_apply_connection_id_restarts_ble_server_and_clears_state(self):
+        daemon, mock_server = _make_daemon()
+        mock_server.stop = AsyncMock()
+        daemon._service_uuid = OHM_SERVICE_UUID
+        daemon._device_connected = True
+        daemon._has_subscribers = True
+        daemon._notify_queue.put_nowait((OHM_SERVICE_UUID, HISTORY_CHAR_UUID))
+
+        with patch.object(daemon, "_setup_ble", new_callable=AsyncMock) as setup_ble:
+            await daemon._apply_connection_id(12)
+
+        mock_server.stop.assert_awaited_once()
+        setup_ble.assert_awaited_once_with(connection_id=12)
+        assert daemon._device_connected is False
+        assert daemon._has_subscribers is False
+        assert daemon._notify_queue.empty()
+
+    @pytest.mark.asyncio
+    async def test_apply_connection_id_rolls_back_when_new_setup_fails(self):
+        daemon, mock_server = _make_daemon()
+        mock_server.stop = AsyncMock()
+        daemon._connection_id = 7
+        daemon._service_uuid = service_uuid_for_connection_id(7)
+        daemon._device_connected = True
+        daemon._has_subscribers = True
+
+        with patch.object(
+            daemon,
+            "_setup_ble",
+            new_callable=AsyncMock,
+            side_effect=[RuntimeError("new service failed"), None],
+        ) as setup_ble:
+            await daemon._apply_connection_id(12)
+
+        mock_server.stop.assert_awaited_once()
+        assert setup_ble.await_args_list == [
+            call(connection_id=12),
+            call(connection_id=7),
+        ]
+        assert daemon._connection_id == 7
+        assert daemon._service_uuid == service_uuid_for_connection_id(7)
+
     @pytest.mark.asyncio
     async def test_canonical_message_pushes_frame(self):
         from ohm.protocol import CanonicalIpcMessage, encode_message

@@ -40,7 +40,8 @@ The daemon log is at `~/.oh-my-wrist/daemon.log`.
 
 ## IPC Transport
 
-On macOS the daemon listens on a Unix domain socket at `/tmp/ohm.sock`.
+On macOS the daemon listens on a private Unix domain socket at
+`/tmp/oh-my-wrist-<uid>/ohm.sock`.
 
 ## Troubleshooting
 

@@ -20,10 +20,11 @@
 - 🖥️ **Cross-platform** — runs on Linux, macOS, and Windows
 - 📳 **Haptic alerts** — vibration patterns for idle, session done, destructive commands, and agent completion
 - 🖤 **CLI-styled watch UI** — terminal aesthetic with animated amber spinner, event stack, and per-provider stats
+- 🔒 **Connection ID filter** — optional 0–255 ID keeps nearby users' watches from pairing with each other
 - 🌙 **Quiet hours** — suppress vibrations during configurable time windows
 
 <p align="center">
-  <img src="static/demo.gif" alt="Oh-My-Wrist Watch Demo" width="400"/>
+  <img src="static/demo.gif" alt="Oh-My-Wrist Watch Demo"/>
 </p>
 
 ## Quick Start
@@ -109,6 +110,10 @@ The usage screen is Claude-only and shows an empty bar with no percentage
 when quota data is unavailable (API-key users, or before the first API
 response in a session).
 
+Press **SELECT/START** on any view to open the app menu. Use **Set id** to
+save the same 0–255 connection ID configured on your desktop daemon, then
+restart the watch app so the new BLE service UUID is registered cleanly.
+
 ### CLI Commands
 
 | Command | Purpose |
@@ -120,6 +125,7 @@ response in a session).
 | `oh-my-wrist uninstall [--provider …]` | Remove hooks, plugin, and service |
 | `oh-my-wrist test [message] [--provider claude\|opencode]` | Send a test message to the daemon |
 | `oh-my-wrist config [--show\|--haptic on\|off\|--quiet-start HH:MM\|--quiet-end HH:MM]` | View or update configuration |
+| `oh-my-wrist set-id ID` | Set BLE connection ID (`0`–`255`) and queue an update for a running daemon |
 | `oh-my-wrist opencode install\|uninstall\|status` | Manage the OpenCode plugin |
 | `oh-my-wrist logs [-n LINES]` | Tail the daemon log |
 
@@ -137,6 +143,9 @@ oh-my-wrist config --haptic off
 
 # Set quiet hours (vibrations suppressed)
 oh-my-wrist config --quiet-start 22:00 --quiet-end 08:00
+
+# Set BLE connection ID to match the watch menu's Set id value
+oh-my-wrist set-id 42
 ```
 
 | Setting | Default | Description |
@@ -144,22 +153,27 @@ oh-my-wrist config --quiet-start 22:00 --quiet-end 08:00
 | `haptic_enabled` | `true` | Enable/disable all vibration alerts |
 | `quiet_start` | `22:00` | Start of quiet window (HH:MM) |
 | `quiet_end` | `08:00` | End of quiet window (HH:MM) |
+| `connection_id` | `0` | BLE scan filter ID. The watch only connects to daemons with the same ID. |
+
+The connection ID is not authentication; it is a collision reducer for rooms
+where multiple people run oh-my-wrist. ID `0` is the default and preserves the
+original BLE service UUID.
 
 ## Supported Devices
 
-Requires a Garmin watch with BLE and Connect IQ 3.1+ support:
+Requires a Garmin watch with Connect IQ Generic BLE support (API level alone is not enough):
 
 - Fenix 7 / 7S / 7X
 - Fenix 8 43mm / 47mm
 - Forerunner 265 / 955
 - Venu 3 / 3S
-- Vivoactive 3 / 3 Music / 4
+- Vivoactive 3 Music / 4
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Watch can't find daemon | Run `oh-my-wrist status` — verify daemon is advertising. Restart with `oh-my-wrist stop && oh-my-wrist start`. |
+| Watch can't find daemon | Run `oh-my-wrist status` — verify daemon is advertising and that desktop/watch connection IDs match. Restart with `oh-my-wrist stop && oh-my-wrist start`. |
 | Hook not firing | Run `oh-my-wrist status` — confirm hooks in `~/.claude/settings.json`. Re-run `oh-my-wrist install`. |
 | OpenCode not updating | Check plugin: `oh-my-wrist opencode status`. Re-install: `oh-my-wrist opencode install`. |
 | BLE permission errors | See your platform guide: [Linux](docs/INSTALL_LINUX.md) · [macOS](docs/INSTALL_MACOS.md) · [Windows](docs/INSTALL_WINDOWS.md) |

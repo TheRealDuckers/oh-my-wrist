@@ -25,6 +25,8 @@ Coverage
 from __future__ import annotations
 
 import json
+import os
+import stat
 from datetime import time as dtime
 from pathlib import Path
 from unittest.mock import patch
@@ -60,6 +62,7 @@ class TestConfigDefaults:
         assert cfg.haptic_enabled is True
         assert cfg.quiet_start == "22:00"
         assert cfg.quiet_end == "08:00"
+        assert cfg.connection_id == 0
 
     def test_defaults_with_empty_dict(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
@@ -115,6 +118,33 @@ class TestConfigDefaults:
         assert cfg.haptic_enabled is False
         assert cfg.quiet_start == "22:00"  # still default
         assert cfg.quiet_end == "08:00"
+        assert cfg.connection_id == 0
+
+    def test_connection_id_loaded_from_json(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        config_dir.mkdir(parents=True)
+        config_path.write_text('{"connection_id": 42}\n', encoding="utf-8")
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import load_config
+
+            cfg = load_config()
+        assert cfg.connection_id == 42
+
+    def test_invalid_connection_id_falls_back_to_default(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        config_dir.mkdir(parents=True)
+        config_path.write_text('{"connection_id": 999}\n', encoding="utf-8")
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import load_config
+
+            cfg = load_config()
+        assert cfg.connection_id == 0
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +169,7 @@ class TestSaveConfig:
         assert data["haptic_enabled"] is False
         assert data["quiet_start"] == "23:00"
         assert data["quiet_end"] == "07:00"
+        assert data["connection_id"] == 0
 
     def test_save_trailing_newline(self, tmp_path):
         config_dir, config_path = _make_config_dir(tmp_path)
@@ -176,6 +207,58 @@ class TestSaveConfig:
 
             save_config(Config({}))
         assert config_dir.exists()
+
+    def test_save_config_uses_private_permissions(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import Config, save_config
+
+            save_config(Config({}))
+
+        if os.name == "posix":
+            assert stat.S_IMODE(config_dir.stat().st_mode) == 0o700
+            assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+
+
+class TestControlToken:
+    def test_control_token_is_persisted_with_private_permissions(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import get_control_token
+
+            token1 = get_control_token()
+            token2 = get_control_token()
+
+        token_path = config_dir / "control.token"
+        assert token1 == token2
+        assert len(token1) >= 32
+        assert token_path.read_text(encoding="utf-8").strip() == token1
+        if os.name == "posix":
+            assert stat.S_IMODE(config_dir.stat().st_mode) == 0o700
+            assert stat.S_IMODE(token_path.stat().st_mode) == 0o600
+
+    def test_control_token_recovers_empty_file(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        config_dir.mkdir(parents=True)
+        (config_dir / "control.token").write_text("", encoding="utf-8")
+
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import get_control_token
+
+            token = get_control_token()
+
+        assert len(token) >= 32
+        assert (config_dir / "control.token").read_text(encoding="utf-8").strip()
+        assert not (config_dir / ".control.token.lock").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +328,33 @@ class TestSetters:
         from ohm.config import Config
 
         assert isinstance(result, Config)
+
+    def test_set_connection_id(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import set_connection_id, load_config
+
+            set_connection_id(255)
+            cfg = load_config()
+        assert cfg.connection_id == 255
+
+    def test_set_connection_id_rejects_out_of_range(self, tmp_path):
+        config_dir, config_path = _make_config_dir(tmp_path)
+        with (
+            patch("ohm.config.CONFIG_DIR", config_dir),
+            patch("ohm.config.CONFIG_PATH", config_path),
+        ):
+            from ohm.config import set_connection_id
+
+            try:
+                set_connection_id(256)
+            except ValueError as exc:
+                assert "connection_id" in str(exc)
+            else:
+                raise AssertionError("set_connection_id accepted 256")
 
 
 # ---------------------------------------------------------------------------
@@ -365,3 +475,9 @@ class TestConfigRepr:
 
         cfg = Config({"quiet_start": "21:00"})
         assert "21:00" in repr(cfg)
+
+    def test_repr_contains_connection_id(self):
+        from ohm.config import Config
+
+        cfg = Config({"connection_id": 7})
+        assert "connection_id=7" in repr(cfg)

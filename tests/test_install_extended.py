@@ -22,6 +22,7 @@ import pytest
 from ohm.install import (
     OPENCODE_PLUGIN_FILENAME,
     _OPENCODE_PLUGIN_ENTRY,
+    _OPENCODE_PLUGIN_STUB,
     _atomic_write_json,
     _atomic_write_text,
     find_opencode_project_root,
@@ -157,6 +158,26 @@ class TestInstallOpencodePlugin:
         content = plugin_path.read_text(encoding="utf-8")
         assert "OhMyWristPlugin" in content
         assert "sendToDaemon" in content
+        assert "export default OhMyWristPlugin" in content
+        assert "export const OhMyWristPlugin" not in content
+
+    def test_plugin_file_uses_private_unix_socket_path(self, tmp_project):
+        install_opencode_plugin(tmp_project)
+        plugin_path = self.global_plugins_dir / OPENCODE_PLUGIN_FILENAME
+        content = plugin_path.read_text(encoding="utf-8")
+        assert "oh-my-wrist" in content
+        assert "ohm.sock" in content
+        assert "/tmp/ohm.sock" not in content
+        assert "os.tmpdir" not in content
+
+    def test_fallback_stub_uses_private_unix_socket_path(self):
+        assert "oh-my-wrist" in _OPENCODE_PLUGIN_STUB
+        assert "ohm.sock" in _OPENCODE_PLUGIN_STUB
+        assert "/tmp/ohm.sock" not in _OPENCODE_PLUGIN_STUB
+        assert "os.tmpdir" not in _OPENCODE_PLUGIN_STUB
+        assert r"String.raw`\\.\pipe\ohm`" in _OPENCODE_PLUGIN_STUB
+        assert "export default OhMyWristPlugin" in _OPENCODE_PLUGIN_STUB
+        assert "export const OhMyWristPlugin" not in _OPENCODE_PLUGIN_STUB
 
     def test_idempotent_install(self, tmp_project):
         install_opencode_plugin(tmp_project)

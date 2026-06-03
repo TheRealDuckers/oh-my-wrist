@@ -369,10 +369,19 @@ _OPENCODE_PLUGIN_STUB = """\
 // oh_my_wrist_opencode.ts — auto-generated stub
 // Full source is in opencode/plugins/ of the oh-my-wrist package.
 import * as net from "net";
+import * as os from "os";
+import * as path from "path";
+
+function unixSocketPath(): string {
+  const uid = typeof process.getuid === "function"
+    ? process.getuid()
+    : os.userInfo().uid;
+  return path.join("/tmp", `oh-my-wrist-${uid}`, "ohm.sock");
+}
 
 const SOCKET_PATH = process.platform === "win32"
-  ? String.raw`\\\\\\\\.\\\\pipe\\\\ohm`
-  : "/tmp/ohm.sock";
+  ? String.raw`\\\\.\\pipe\\ohm`
+  : unixSocketPath();
 
 async function sendToDaemon(payload: object): Promise<void> {
   const json = JSON.stringify(payload) + "\\n";
@@ -386,7 +395,7 @@ async function sendToDaemon(payload: object): Promise<void> {
   });
 }
 
-export const OhMyWristPlugin = async (_ctx: unknown) => {
+const OhMyWristPlugin = async (_ctx: unknown) => {
   return {
     "tool.execute.before": async (input: any, output: any) => {
       await sendToDaemon({
@@ -424,6 +433,8 @@ export const OhMyWristPlugin = async (_ctx: unknown) => {
     },
   };
 };
+
+export default OhMyWristPlugin;
 """
 
 
