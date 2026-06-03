@@ -23,8 +23,6 @@ find_monkeyc() {
     exit 1
 }
 
-MONKEYC="$(find_monkeyc)"
-
 # --- Find developer key ------------------------------------------------------
 
 find_key() {
@@ -67,6 +65,8 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+MONKEYC="$(find_monkeyc)"
 
 if [[ -n "$KEY_OVERRIDE" ]]; then
     DEV_KEY="$KEY_OVERRIDE"
@@ -147,7 +147,16 @@ rm -rf "$OUT_DIR"/gen "$OUT_DIR"/internal-mir "$OUT_DIR"/mir
 rm -f "$OUT_DIR"/*.debug.xml
 
 echo "=== Output ==="
-ls -lh "$OUT_DIR"/*.prg "$OUT_DIR"/*.iq 2>/dev/null
+ARTIFACTS=()
+for artifact in "$OUT_DIR"/*.prg "$OUT_DIR"/*.iq; do
+    if [[ -e "$artifact" ]]; then
+        ARTIFACTS+=("$artifact")
+    fi
+done
+
+if [[ ${#ARTIFACTS[@]} -gt 0 ]]; then
+    ls -lh "${ARTIFACTS[@]}"
+fi
 echo ""
 
 if [[ ${#FAILED[@]} -gt 0 ]]; then
