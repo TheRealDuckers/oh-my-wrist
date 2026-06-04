@@ -1,0 +1,195 @@
+name: Garmin Release Artifacts
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build, for example v0.1.0"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: garmin-release-${{ github.event.release.tag_name || github.ref_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build-garmin-prg:
+    name: Build Garmin PRG release assets
+    runs-on: ${{ vars.GARMIN_RELEASE_RUNNER || 'ubuntu-latest' }}
+    env:
+      GARMIN_DEV_KEY_B64: ${{ secrets.GARMIN_DEV_KEY_B64 }}
+      GARMIN_SDK_URL: ${{ secrets.GARMIN_SDK_URL }}
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          tag=""
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            tag="$RELEASE_TAG"
+          elif [[ -n "$INPUT_TAG" ]]; then
+            tag="$INPUT_TAG"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            tag="$REF_NAME"
+          fi
+
+          if [[ -z "$tag" ]]; then
+            echo "::error title=Release tag required::Publish a GitHub Release or provide the workflow_dispatch tag input."
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install packaging tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if command -v unzip >/dev/null 2>&1 && command -v zip >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y unzip zip
+            exit 0
+          fi
+
+          echo "::error title=Missing packaging tools::Install zip and unzip on the release runner."
+          exit 1
+
+      - name: Locate or install Garmin Connect IQ SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${GARMIN_SDK_URL:-}" ]]; then
+            sdk_zip="$RUNNER_TEMP/connectiq-sdk.zip"
+            sdk_dir="$RUNNER_TEMP/connectiq-sdk"
+
+            mkdir -p "$sdk_dir"
+            curl -fsSL "$GARMIN_SDK_URL" -o "$sdk_zip"
+            unzip -q "$sdk_zip" -d "$sdk_dir"
+
+            monkeyc="$(find "$sdk_dir" -type f -path '*/bin/monkeyc' | sort | tail -n 1)"
+            if [[ -z "$monkeyc" ]]; then
+              echo "::error title=monkeyc not found::GARMIN_SDK_URL did not unpack to a Connect IQ SDK containing bin/monkeyc."
+              exit 1
+            fi
+
+            chmod +x "$monkeyc"
+            echo "MONKEYC=$monkeyc" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          candidates=(
+            "$HOME/.Garmin/ConnectIQ/Sdks"/*/bin/monkeyc
+            /opt/connectiq-sdk/*/bin/monkeyc
+            /opt/connectiq-sdk/bin/monkeyc
+          )
+
+          for candidate in "${candidates[@]}"; do
+            if [[ -x "$candidate" ]]; then
+              echo "MONKEYC=$candidate" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+
+          echo "::error title=Garmin SDK not found::Set GARMIN_SDK_URL to a Linux Connect IQ SDK zip URL or use a self-hosted runner with monkeyc installed."
+          exit 1
+
+      - name: Decode Garmin developer key
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GARMIN_DEV_KEY_B64:-}" ]]; then
+            echo "::error title=Missing GARMIN_DEV_KEY_B64::Store the base64-encoded Garmin developer key in the GARMIN_DEV_KEY_B64 repository secret."
+            exit 1
+          fi
+
+          key_path="$RUNNER_TEMP/garmin_developer_key"
+          printf '%s' "$GARMIN_DEV_KEY_B64" | base64 --decode > "$key_path"
+          chmod 600 "$key_path"
+          echo "GARMIN_DEV_KEY=$key_path" >> "$GITHUB_ENV"
+
+      - name: Build per-device PRG files
+        run: bash tools/build_garmin.sh release --key "$GARMIN_DEV_KEY"
+
+      - name: Package release assets
+        id: package
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          garmin_dir="build/garmin"
+          release_dir="build/release"
+          zip_name="oh-my-wrist-prg-${TAG}.zip"
+          checksum_name="oh-my-wrist-prg-${TAG}.sha256"
+
+          mkdir -p "$release_dir"
+          mapfile -t prg_files < <(find "$garmin_dir" -maxdepth 1 -type f -name '*.prg' | sort)
+          device_count="$(sed -nE 's/.*product id="([^"]+)".*/\1/p' garmin/manifest.xml | wc -l | tr -d ' ')"
+          prg_count="${#prg_files[@]}"
+
+          if [[ "$prg_count" -ne "$device_count" ]]; then
+            echo "::error title=Unexpected PRG count::Built $prg_count .prg files, but manifest declares $device_count products."
+            exit 1
+          fi
+
+          (
+            cd "$garmin_dir"
+            zip -9 "../release/$zip_name" ./*.prg
+          )
+
+          sha256sum "${prg_files[@]}" "$release_dir/$zip_name" > "$release_dir/$checksum_name"
+
+          echo "zip=$release_dir/$zip_name" >> "$GITHUB_OUTPUT"
+          echo "checksums=$release_dir/$checksum_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oh-my-wrist-prg-${{ steps.release.outputs.tag }}
+          path: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.checksums }}
+          if-no-files-found: error
+
+      - name: Upload GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          files: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.checksums }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          overwrite_files: true

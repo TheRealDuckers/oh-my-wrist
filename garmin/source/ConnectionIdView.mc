@@ -28,7 +28,7 @@ class ConnectionIdView extends WatchUi.View {
             w / 2,
             h * 0.16,
             Graphics.FONT_XTINY,
-            "[ connection.id ]",
+            WatchUi.loadResource(Rez.Strings.ConnectionIdHeader),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
 
@@ -47,14 +47,14 @@ class ConnectionIdView extends WatchUi.View {
                 w / 2,
                 h * 0.66,
                 Graphics.FONT_XTINY,
-                "Saved. Restart app",
+                WatchUi.loadResource(Rez.Strings.ConnectionIdSaved),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
             );
             dc.drawText(
                 w / 2,
                 h * 0.76,
                 Graphics.FONT_XTINY,
-                "BACK exit",
+                WatchUi.loadResource(Rez.Strings.ConnectionIdBackExit),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
             );
         } else {
@@ -62,14 +62,14 @@ class ConnectionIdView extends WatchUi.View {
                 w / 2,
                 h * 0.66,
                 Graphics.FONT_XTINY,
-                "UP/DOWN edit",
+                WatchUi.loadResource(Rez.Strings.ConnectionIdEditHint),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
             );
             dc.drawText(
                 w / 2,
                 h * 0.76,
                 Graphics.FONT_XTINY,
-                "SELECT save",
+                WatchUi.loadResource(Rez.Strings.ConnectionIdSaveHint),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
             );
         }
@@ -121,12 +121,12 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
         var key = evt.getKey();
 
         if (key == WatchUi.KEY_UP) {
-            _view.adjust(-1);
+            _view.adjust(1);
             return true;
         }
 
         if (key == WatchUi.KEY_DOWN) {
-            _view.adjust(1);
+            _view.adjust(-1);
             return true;
         }
 
@@ -144,22 +144,22 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onNextPage() {
-        _view.adjust(1);
+        _view.adjust(-1);
         return true;
     }
 
     function onPreviousPage() {
-        _view.adjust(-1);
-        return true;
-    }
-
-    function onNextMode() {
         _view.adjust(1);
         return true;
     }
 
-    function onPreviousMode() {
+    function onNextMode() {
         _view.adjust(-1);
+        return true;
+    }
+
+    function onPreviousMode() {
+        _view.adjust(1);
         return true;
     }
 
@@ -176,7 +176,11 @@ class ConnectionIdDelegate extends WatchUi.BehaviorDelegate {
     function _saveAndRefreshMenu() {
         _view.save();
         if (_menuItem != null) {
-            _menuItem.setSubLabel("current " + ConnectionIdModel.getId());
+            _menuItem.setSubLabel(
+                WatchUi.loadResource(Rez.Strings.ConnectionIdCurrentPrefix) +
+                    " " +
+                    ConnectionIdModel.getId().toString()
+            );
             WatchUi.requestUpdate();
         }
     }

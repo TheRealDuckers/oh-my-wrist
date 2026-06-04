@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "monkeyc",
+      "request": "launch",
+      "name": "Run oh-my-wrist",
+      "device": "${command:GetTargetDevice}",
+      "prg": "${workspaceFolder}/bin/oh-my-wrist.prg",
+      "prgDebugXml": "${workspaceFolder}/bin/oh-my-wrist.prg.debug.xml",
+      "stopAtLaunch": false
+    }
+  ]
+}

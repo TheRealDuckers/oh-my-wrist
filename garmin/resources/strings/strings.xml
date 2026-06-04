@@ -1,12 +1,21 @@
 <?xml version="1.0"?>
 <strings>
     <!-- Application name (manifest) and title bar -->
-    <string id="AppName">Oh-My-Wrist</string>
-    <string id="AppTitle">✎_</string>
+    <string id="AppName">oh-my-wrist</string>
+    <string id="AppTitle">oh-my-wrist</string>
 
     <!-- CLI-aesthetic headers -->
     <string id="HeaderPrompt">[ admin@wrist:~$ ]</string>
     <string id="StatsHeaderClaude">[ claude.session ]</string>
     <string id="StatsHeaderOpenCode">[ opencode.session ]</string>
     <string id="UsageHeaderClaude">[ claude.usage ]</string>
+
+    <!-- Connection ID menu/editor -->
+    <string id="ConnectionIdMenuLabel">Set id</string>
+    <string id="ConnectionIdCurrentPrefix">current</string>
+    <string id="ConnectionIdHeader">[ connection.id ]</string>
+    <string id="ConnectionIdSaved">Saved. Restart app</string>
+    <string id="ConnectionIdBackExit">BACK exit</string>
+    <string id="ConnectionIdEditHint">UP/DOWN edit</string>
+    <string id="ConnectionIdSaveHint">SELECT save</string>
 </strings>

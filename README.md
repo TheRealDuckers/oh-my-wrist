@@ -1,30 +1,30 @@
 <p align="center">
-  <img src="static/ohw_logo_transparent.png" alt="Oh-My-Wrist Logo" width="240"/>
+  <img src="static/ohw_logo_transparent.png" alt="oh-my-wrist logo" width="240"/>
 </p>
 
-<h1 align="center">Oh-My-Wrist</h1>
+<h1 align="center">oh-my-wrist</h1>
 
-![Oh-My-Wrist](https://img.shields.io/badge/Oh--My--Wrist-blue)
+![oh-my-wrist](https://img.shields.io/badge/Oh--My--Wrist-blue)
 ![GitHub stars](https://img.shields.io/github/stars/yazon/oh-my-wrist?style=social)
 ![GitHub top language](https://img.shields.io/github/languages/top/yazon/oh-my-wrist)
 ![GitHub repo size](https://img.shields.io/github/repo-size/yazon/oh-my-wrist)
 ![GitHub last commit](https://img.shields.io/github/last-commit/yazon/oh-my-wrist?color=red)
 ![GitHub License](https://img.shields.io/github/license/yazon/oh-my-wrist)
 
-**Oh-My-Wrist** displays real-time [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) and [OpenCode](https://opencode.ai) activity on your Garmin smartwatch over Bluetooth Low Energy. See what your AI coding assistant is doing — right on your wrist.
+**oh-my-wrist displays real-time [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) and [OpenCode](https://opencode.ai) activity on your Garmin smartwatch over Bluetooth Low Energy. See what your AI coding assistant is doing — right on your wrist.**
 
 ## Key Features
 
-- ⌚ **Real-time BLE updates** — tool calls, file edits, and session state streamed to your watch
-- 🤖 **Multi-provider** — supports Claude Code and OpenCode simultaneously, tracked independently
-- 🖥️ **Cross-platform** — runs on Linux, macOS, and Windows
-- 📳 **Haptic alerts** — vibration patterns for idle, session done, destructive commands, and agent completion
-- 🖤 **CLI-styled watch UI** — terminal aesthetic with animated amber spinner, event stack, and per-provider stats
-- 🔒 **Connection ID filter** — optional 0–255 ID keeps nearby users' watches from pairing with each other
-- 🌙 **Quiet hours** — suppress vibrations during configurable time windows
+- **Real-time BLE updates** — tool calls, file edits, and session state streamed to your watch
+- **Multi-provider** — supports Claude Code and OpenCode simultaneously
+- **Cross-platform** — runs on Linux, macOS, and Windows
+- **Haptic alerts** — vibration patterns for idle, session done, destructive commands, and agent completion
+- **CLI-styled watch UI** — terminal aesthetic with animated amber spinner, event stack, and per-provider stats
+- **Connection ID filter** — optional 0–255 ID keeps nearby users' watches from pairing with each other
+- **Quiet hours** — suppress vibrations during configurable time windows
 
 <p align="center">
-  <img src="static/demo.gif" alt="Oh-My-Wrist Watch Demo"/>
+  <img src="static/demo.gif" alt="oh-my-wrist Watch Demo"/>
 </p>
 
 ## Quick Start
@@ -62,9 +62,11 @@ oh-my-wrist install --provider opencode
 
 ### 3. Install the Garmin watch app
 
-1. Open the `garmin/` directory in VS Code with the Monkey C extension.
-2. Build the project (Connect IQ SDK 9.1+).
-3. Side-load the `.prg` file to your watch via USB (copy to `GARMIN/APPS/`), or publish to the Connect IQ Store.
+Install it one of two ways:
+
+1. GitHub Releases: download `oh-my-wrist-prg-<version>.zip` from the latest release, unzip it, connect your Garmin device over USB, then copy the matching `oh-my-wrist-<device-id>.prg` file to `/GARMIN/Apps/`.
+2. Connect IQ Store: link coming soon.
+3. Build from source: install Connect IQ SDK 9.1+, then run `tools/build_garmin.sh release` and copy the generated device-specific `.prg` file from `build/garmin/` to `/GARMIN/Apps/`. VS Code single-device builds from `garmin/` write `bin/oh-my-wrist.prg`.
 
 ### 4. Start coding
 
@@ -72,7 +74,7 @@ oh-my-wrist install --provider opencode
 oh-my-wrist start
 ```
 
-Open the **Oh-My-Wrist** app on your watch — it connects automatically and updates in real time.
+Open the **oh-my-wrist** app on your watch — it connects automatically and updates in real time.
 
 ## Platform Guides
 
@@ -92,6 +94,25 @@ oh-my-wrist start --foreground
 ```
 
 Start a Claude Code or OpenCode session — the watch updates automatically.
+
+### Connection Check
+
+From a source checkout, run the one-minute diagnostic stream to verify the
+daemon-to-watch link without starting a real Claude Code or OpenCode session:
+
+```bash
+python tools/check_connection.py
+```
+
+Keep the daemon running and the watch app open. You should see history rows
+change, Claude/OpenCode stats increment, and Claude usage bars move. Useful
+options:
+
+```bash
+python tools/check_connection.py --duration 30
+python tools/check_connection.py --dry-run
+python tools/check_connection.py --provider claude
+```
 
 ### Watch Navigation
 
@@ -163,17 +184,15 @@ original BLE service UUID.
 
 Requires a Garmin watch with Connect IQ Generic BLE support (API level alone is not enough):
 
-- Fenix 7 / 7S / 7X
-- Fenix 8 43mm / 47mm
-- Forerunner 265 / 955
-- Venu 3 / 3S
-- Vivoactive 3 Music / 4
+Manifest product IDs: `approachs50`, `approachs7042mm`, `approachs7047mm`, `d2air`, `d2airx10`, `d2mach1`, `d2mach2`, `d2mach2pro`, `descentg1`, `descentg2`, `descentmk2`, `descentmk2s`, `descentmk343mm`, `descentmk351mm`, `edge1030`, `edge1030plus`, `edge1040`, `edge1050`, `edge530`, `edge540`, `edge550`, `edge830`, `edge840`, `edge850`, `edgeexplore`, `edgeexplore2`, `edgemtb`, `enduro`, `enduro3`, `epix2`, `epix2pro42mm`, `epix2pro47mm`, `epix2pro51mm`, `etrextouch`, `fenix5plus`, `fenix5splus`, `fenix5xplus`, `fenix6`, `fenix6pro`, `fenix6s`, `fenix6spro`, `fenix6xpro`, `fenix7`, `fenix7pro`, `fenix7pronowifi`, `fenix7s`, `fenix7spro`, `fenix7x`, `fenix7xpro`, `fenix7xpronowifi`, `fenix843mm`, `fenix847mm`, `fenix8pro47mm`, `fenix8solar47mm`, `fenix8solar51mm`, `fenixe`, `fr165`, `fr165m`, `fr170`, `fr170m`, `fr245`, `fr245m`, `fr255`, `fr255m`, `fr255s`, `fr255sm`, `fr265`, `fr265s`, `fr55`, `fr57042mm`, `fr57047mm`, `fr645m`, `fr70`, `fr745`, `fr945`, `fr945lte`, `fr955`, `fr965`, `fr970`, `gpsmap66`, `gpsmap67`, `gpsmaph1`, `instinct2`, `instinct2s`, `instinct2x`, `instinct3amoled45mm`, `instinct3amoled50mm`, `instinct3solar45mm`, `instinctcrossover`, `instinctcrossoveramoled`, `instincte40mm`, `instincte45mm`, `legacyherocaptainmarvel`, `legacyherofirstavenger`, `legacysagadarthvader`, `legacysagarey`, `marq2`, `marq2aviator`, `marqadventurer`, `marqathlete`, `marqaviator`, `marqcaptain`, `marqcommander`, `marqdriver`, `marqexpedition`, `marqgolfer`, `montana7xx`, `venu`, `venu2`, `venu2plus`, `venu2s`, `venu3`, `venu3s`, `venu441mm`, `venu445mm`, `venud`, `venusq2m`, `venusqm`, `venux1`, `vivoactive3m`, `vivoactive3mlte`, `vivoactive4`, `vivoactive4s`, `vivoactive5`, `vivoactive6`.
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Watch can't find daemon | Run `oh-my-wrist status` — verify daemon is advertising and that desktop/watch connection IDs match. Restart with `oh-my-wrist stop && oh-my-wrist start`. |
+| Watch can't find daemon | Run `oh-my-wrist status` — verify daemon is advertising and that desktop/watch connection IDs match. Restart with `oh-my-wrist stop && oh-my-wrist start`. From a source checkout, run `python tools/check_connection.py` with the watch app open to exercise live HISTORY, stats, and usage updates. |
+| Garmin app does not connect to daemon on PC | Make sure your Bluetooth adapter is supported. Some adapters or OS settings, such as Windows random MAC behavior, can prevent stable BLE connections. If problems persist, macOS or Linux is preferred. |
+| Garmin app does not start on watch | Create an empty `/GARMIN/Apps/Logs/garmin.log` file on the device, run the app, wait for the issue to occur, reconnect the device to your PC, download `garmin.log`, then create a GitHub issue with the log for debugging. |
 | Hook not firing | Run `oh-my-wrist status` — confirm hooks in `~/.claude/settings.json`. Re-run `oh-my-wrist install`. |
 | OpenCode not updating | Check plugin: `oh-my-wrist opencode status`. Re-install: `oh-my-wrist opencode install`. |
 | BLE permission errors | See your platform guide: [Linux](docs/INSTALL_LINUX.md) · [macOS](docs/INSTALL_MACOS.md) · [Windows](docs/INSTALL_WINDOWS.md) |
@@ -187,6 +206,10 @@ pip uninstall oh-my-wrist
 ```
 
 To remove the watch app, delete it via Garmin Express or the Connect IQ app on your phone.
+
+## Contributing
+
+Contributions are more than welcome. Please contribute! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ## Development
 
@@ -205,7 +228,3 @@ oh-my-wrist start --foreground
 ## License
 
 This project is licensed under the BSD 3-Clause License. See the [LICENSE](LICENSE) file for details.
-
----
-
-**⌚ Ready to see your AI assistant's activity on your wrist? Install Oh-My-Wrist and start coding!**

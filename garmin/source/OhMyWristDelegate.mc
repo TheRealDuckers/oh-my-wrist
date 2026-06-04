@@ -36,8 +36,10 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
         var menu = new WatchUi.Menu2({ :title => "Oh-My-Wrist" });
         menu.addItem(
             new WatchUi.MenuItem(
-                "Set id",
-                "current " + ConnectionIdModel.getId(),
+                WatchUi.loadResource(Rez.Strings.ConnectionIdMenuLabel),
+                WatchUi.loadResource(Rez.Strings.ConnectionIdCurrentPrefix) +
+                    " " +
+                    ConnectionIdModel.getId().toString(),
                 "set_id",
                 {}
             )

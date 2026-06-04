@@ -11,6 +11,20 @@ APP_NAME="oh-my-wrist"
 # --- Find monkeyc -----------------------------------------------------------
 
 find_monkeyc() {
+    if [[ -n "${MONKEYC:-}" ]]; then
+        if [[ -x "$MONKEYC" ]]; then
+            echo "$MONKEYC"
+            return
+        fi
+        echo "Error: MONKEYC is set but not executable: $MONKEYC" >&2
+        exit 1
+    fi
+
+    if [[ -n "${CONNECTIQ_SDK_HOME:-}" && -x "$CONNECTIQ_SDK_HOME/bin/monkeyc" ]]; then
+        echo "$CONNECTIQ_SDK_HOME/bin/monkeyc"
+        return
+    fi
+
     local candidates=("$HOME/.Garmin/ConnectIQ/Sdks"/*/bin/monkeyc)
     for c in "${candidates[@]}"; do
         if [[ -x "$c" ]]; then
@@ -52,7 +66,14 @@ while [[ $# -gt 0 ]]; do
         release) MODE="release" ;;
         store)   MODE="store" ;;
         all)     MODE="all" ;;
-        --key)   KEY_OVERRIDE="$2"; shift ;;
+        --key)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --key requires a path" >&2
+                exit 1
+            fi
+            KEY_OVERRIDE="$2"
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [release|store|all] [--key /path/to/developer_key]"
             echo ""
@@ -79,7 +100,7 @@ fi
 DEVICES=()
 while IFS= read -r line; do
     DEVICES+=("$line")
-done < <(grep -oP 'product id="\K[^"]+' "$MANIFEST")
+done < <(sed -nE 's/.*product id="([^"]+)".*/\1/p' "$MANIFEST")
 
 if [[ ${#DEVICES[@]} -eq 0 ]]; then
     echo "Error: no devices found in $MANIFEST" >&2
@@ -92,6 +113,13 @@ echo "Devices: ${#DEVICES[@]} (${DEVICES[*]})"
 echo ""
 
 mkdir -p "$OUT_DIR"
+
+if [[ "$MODE" == "release" || "$MODE" == "all" ]]; then
+    rm -f "$OUT_DIR"/*.prg
+fi
+if [[ "$MODE" == "store" || "$MODE" == "all" ]]; then
+    rm -f "$OUT_DIR"/*.iq
+fi
 
 FAILED=()
 

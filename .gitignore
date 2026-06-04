@@ -8,6 +8,7 @@ __pycache__/
 
 # Garmin build output
 build/
+garmin/bin/
 
 # Node dependencies
 .opencode/node_modules/
