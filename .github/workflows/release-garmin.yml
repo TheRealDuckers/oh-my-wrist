@@ -23,15 +23,18 @@ jobs:
     runs-on: ${{ vars.GARMIN_RELEASE_RUNNER || 'ubuntu-latest' }}
     env:
       GARMIN_DEV_KEY_B64: ${{ secrets.GARMIN_DEV_KEY_B64 }}
-      GARMIN_SDK_URL: ${{ secrets.GARMIN_SDK_URL }}
+      GARMIN_SDK_URL: ${{ secrets.GARMIN_SDK_URL || vars.GARMIN_SDK_URL }}
 
     steps:
-      - name: Resolve release tag
+      - name: Resolve release inputs
         id: release
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
+          SOURCE_REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -39,8 +42,13 @@ jobs:
           set -euo pipefail
 
           tag=""
+          checkout_ref="$SOURCE_REF"
+          upload_release_assets="false"
+
           if [[ "$EVENT_NAME" == "release" ]]; then
             tag="$RELEASE_TAG"
+            checkout_ref="$RELEASE_TAG"
+            upload_release_assets="true"
           elif [[ -n "$INPUT_TAG" ]]; then
             tag="$INPUT_TAG"
           elif [[ "$REF_TYPE" == "tag" ]]; then
@@ -48,16 +56,21 @@ jobs:
           fi
 
           if [[ -z "$tag" ]]; then
-            echo "::error title=Release tag required::Publish a GitHub Release or provide the workflow_dispatch tag input."
-            exit 1
+            tag="manual-$RUN_NUMBER"
+          fi
+
+          if [[ -z "$checkout_ref" ]]; then
+            checkout_ref="$COMMIT_SHA"
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+          echo "upload_release_assets=$upload_release_assets" >> "$GITHUB_OUTPUT"
 
-      - name: Check out release tag
+      - name: Check out source ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ steps.release.outputs.checkout_ref }}
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -93,13 +106,63 @@ jobs:
             sdk_dir="$RUNNER_TEMP/connectiq-sdk"
 
             mkdir -p "$sdk_dir"
-            curl -fsSL "$GARMIN_SDK_URL" -o "$sdk_zip"
+            if [[ "$GARMIN_SDK_URL" == *"drive.google.com"* || "$GARMIN_SDK_URL" == *"drive.usercontent.google.com"* ]]; then
+              if ! command -v python3 >/dev/null 2>&1; then
+                echo "::error title=Python unavailable::Google Drive SDK downloads require python3 so the workflow can install gdown. Use a direct zip URL or a runner with python3 installed."
+                exit 1
+              fi
+
+              if ! python3 -m pip install --user --quiet gdown; then
+                python3 -m pip install --user --quiet --break-system-packages gdown
+              fi
+              python3 -m gdown --quiet "$GARMIN_SDK_URL" -O "$sdk_zip"
+            else
+              curl -fsSL --retry 3 --retry-delay 5 "$GARMIN_SDK_URL" -o "$sdk_zip"
+            fi
+
+            if ! unzip -Z1 "$sdk_zip" >/dev/null 2>&1; then
+              downloaded_size="$(wc -c < "$sdk_zip" | tr -d ' ')"
+              downloaded_type="$(file -b "$sdk_zip" 2>/dev/null || true)"
+              if [[ -z "$downloaded_type" ]]; then
+                downloaded_type="unknown file type"
+              fi
+
+              if [[ "$GARMIN_SDK_URL" == *"drive.google.com"* || "$GARMIN_SDK_URL" == *"drive.usercontent.google.com"* ]]; then
+                echo "::error title=Downloaded SDK is not a zip::Google Drive returned $downloaded_type ($downloaded_size bytes), not the SDK zip. Confirm the Drive file is shared with anyone who has the link and is not blocked by quota or permissions."
+              else
+                echo "::error title=Downloaded SDK is not a zip::GARMIN_SDK_URL returned $downloaded_type ($downloaded_size bytes), not a zip archive."
+              fi
+              exit 1
+            fi
+
             unzip -q "$sdk_zip" -d "$sdk_dir"
+
+            connectiq_home="$HOME/.Garmin/ConnectIQ"
+            mkdir -p "$connectiq_home"
 
             monkeyc="$(find "$sdk_dir" -type f -path '*/bin/monkeyc' | sort | tail -n 1)"
             if [[ -z "$monkeyc" ]]; then
-              echo "::error title=monkeyc not found::GARMIN_SDK_URL did not unpack to a Connect IQ SDK containing bin/monkeyc."
+              sdkmanager="$(find "$sdk_dir" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)"
+              if [[ -n "$sdkmanager" ]]; then
+                echo "::error title=SDK Manager URL supplied::GARMIN_SDK_URL points to Garmin's SDK Manager app, not a Connect IQ SDK. Use SDK Manager locally to download the Linux Connect IQ SDK, then provide a zip that contains bin/monkeyc, or use a self-hosted runner with monkeyc preinstalled."
+              else
+                echo "::error title=monkeyc not found::GARMIN_SDK_URL must unpack to a Linux Connect IQ SDK archive containing Sdks/<sdk>/bin/monkeyc or any */bin/monkeyc path."
+              fi
               exit 1
+            fi
+
+            devices_dir="$(find "$sdk_dir" -type d -name Devices | sort | head -n 1)"
+            if [[ -n "$devices_dir" ]]; then
+              rm -rf "$connectiq_home/Devices"
+              ln -s "$devices_dir" "$connectiq_home/Devices"
+            else
+              echo "::warning title=Garmin device definitions not found::GARMIN_SDK_URL did not include a Devices directory. Multi-device release builds may fail with invalid device ids."
+            fi
+
+            sdk_root="$(dirname "$(dirname "$monkeyc")")"
+            echo "$sdk_root" > "$connectiq_home/current-sdk.cfg"
+            if [[ -f "$sdk_root/bin/default.jungle" && -d "$connectiq_home/Devices" ]]; then
+              sed -i "s|^devicesPath = .*|devicesPath = \"$connectiq_home/Devices\"|" "$sdk_root/bin/default.jungle"
             fi
 
             chmod +x "$monkeyc"
@@ -134,7 +197,16 @@ jobs:
           fi
 
           key_path="$RUNNER_TEMP/garmin_developer_key"
-          printf '%s' "$GARMIN_DEV_KEY_B64" | base64 --decode > "$key_path"
+          if ! printf '%s' "$GARMIN_DEV_KEY_B64" | base64 --decode > "$key_path"; then
+            echo "::error title=Invalid GARMIN_DEV_KEY_B64::The GARMIN_DEV_KEY_B64 secret is not valid base64. Recreate it with: base64 < \"\$HOME/.Garmin/developer_key\" | tr -d '\\n'"
+            exit 1
+          fi
+
+          if [[ ! -s "$key_path" ]]; then
+            echo "::error title=Empty Garmin developer key::GARMIN_DEV_KEY_B64 decoded to an empty file. Recreate the secret from your Garmin developer key file."
+            exit 1
+          fi
+
           chmod 600 "$key_path"
           echo "GARMIN_DEV_KEY=$key_path" >> "$GITHUB_ENV"
 
@@ -184,6 +256,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload GitHub Release assets
+        if: steps.release.outputs.upload_release_assets == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
