@@ -18,7 +18,7 @@ SERVICE_PATH = SYSTEMD_USER_DIR / f"{SERVICE_NAME}.service"
 
 _SERVICE_TEMPLATE = """\
 [Unit]
-Description=Oh-My-Wrist BLE Daemon
+Description=oh-my-wrist BLE Daemon
 After=network.target bluetooth.target
 
 [Service]

@@ -1,6 +1,6 @@
 # macOS Installation Guide
 
-Platform-specific setup for Oh-My-Wrist on macOS. For general installation steps, see the main [README](../README.md).
+Platform-specific setup for oh-my-wrist on macOS. For general installation steps, see the main [README](../README.md).
 
 ## Prerequisites
 
@@ -76,4 +76,4 @@ oh-my-wrist install
 ### Watch pairs but immediately disconnects
 
 - Ensure the watch is not connected to another BLE peripheral that conflicts.
-- Forget the device on the watch (Settings → Sensors & Accessories → remove Oh-My-Wrist) and let it re-pair.
+- Forget the device on the watch (Settings → Sensors & Accessories → remove oh-my-wrist) and let it re-pair.

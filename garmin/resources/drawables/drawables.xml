@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-  drawables.xml — Drawable resource declarations for Oh-My-Wrist.
+  drawables.xml — Drawable resource declarations for oh-my-wrist.
 
   • LauncherIcon       — widget glance bitmap (Connect IQ store).
   • GlyphPlusGreen … GlyphDotWhite

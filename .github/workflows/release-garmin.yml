@@ -338,8 +338,8 @@ jobs:
           fi
           echo "GARMIN_DEV_KEY=$key_path" >> "$GITHUB_ENV"
 
-      - name: Build per-device PRG files
-        run: bash tools/build_garmin.sh release --key "$GARMIN_DEV_KEY"
+      - name: Build Garmin PRG and IQ files
+        run: bash tools/build_garmin.sh all --key "$GARMIN_DEV_KEY"
 
       - name: Upload Garmin build logs
         if: failure()
@@ -361,14 +361,22 @@ jobs:
           release_dir="build/release"
           zip_name="oh-my-wrist-prg-${TAG}.zip"
           checksum_name="oh-my-wrist-prg-${TAG}.sha256"
+          iq_name="oh-my-wrist-${TAG}.iq"
+          iq_checksum_name="oh-my-wrist-iq-${TAG}.sha256"
 
           mkdir -p "$release_dir"
           mapfile -t prg_files < <(find "$garmin_dir" -maxdepth 1 -type f -name '*.prg' | sort)
           device_count="$(sed -nE 's/.*product id="([^"]+)".*/\1/p' garmin/manifest.xml | wc -l | tr -d ' ')"
           prg_count="${#prg_files[@]}"
+          iq_source="$garmin_dir/oh-my-wrist.iq"
 
           if [[ "$prg_count" -ne "$device_count" ]]; then
             echo "::error title=Unexpected PRG count::Built $prg_count .prg files, but manifest declares $device_count products."
+            exit 1
+          fi
+
+          if [[ ! -s "$iq_source" ]]; then
+            echo "::error title=Missing IQ package::Expected $iq_source to be built for Garmin Connect IQ Store upload."
             exit 1
           fi
 
@@ -377,18 +385,32 @@ jobs:
             zip -9 "../release/$zip_name" ./*.prg
           )
 
+          cp "$iq_source" "$release_dir/$iq_name"
+
           sha256sum "${prg_files[@]}" "$release_dir/$zip_name" > "$release_dir/$checksum_name"
+          sha256sum "$release_dir/$iq_name" > "$release_dir/$iq_checksum_name"
 
           echo "zip=$release_dir/$zip_name" >> "$GITHUB_OUTPUT"
           echo "checksums=$release_dir/$checksum_name" >> "$GITHUB_OUTPUT"
+          echo "iq=$release_dir/$iq_name" >> "$GITHUB_OUTPUT"
+          echo "iq_checksums=$release_dir/$iq_checksum_name" >> "$GITHUB_OUTPUT"
 
-      - name: Upload workflow artifact
+      - name: Upload PRG workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: oh-my-wrist-prg-${{ steps.release.outputs.tag }}
           path: |
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.checksums }}
+          if-no-files-found: error
+
+      - name: Upload IQ workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oh-my-wrist-iq-${{ steps.release.outputs.tag }}
+          path: |
+            ${{ steps.package.outputs.iq }}
+            ${{ steps.package.outputs.iq_checksums }}
           if-no-files-found: error
 
       - name: Upload GitHub Release assets
@@ -399,6 +421,8 @@ jobs:
           files: |
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.checksums }}
+            ${{ steps.package.outputs.iq }}
+            ${{ steps.package.outputs.iq_checksums }}
           fail_on_unmatched_files: true
           generate_release_notes: true
           overwrite_files: true
