@@ -67,10 +67,64 @@ jobs:
           echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
           echo "upload_release_assets=$upload_release_assets" >> "$GITHUB_OUTPUT"
 
+      - name: Install Git LFS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if command -v git-lfs >/dev/null 2>&1; then
+            git lfs version
+            exit 0
+          fi
+
+          if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y git-lfs
+            git lfs version
+            exit 0
+          fi
+
+          echo "::error title=Missing Git LFS::Install git-lfs on the release runner so Garmin PNG assets are downloaded instead of LFS pointer files."
+          exit 1
+
       - name: Check out source ref
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.release.outputs.checkout_ref }}
+          lfs: true
+
+      - name: Verify Garmin image assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image_dir="garmin/resources/drawables"
+          mapfile -t images < <(find "$image_dir" -maxdepth 1 -type f -name '*.png' | sort)
+
+          if [[ "${#images[@]}" -eq 0 ]]; then
+            echo "::error title=Missing Garmin PNG assets::No PNG files were found in $image_dir."
+            exit 1
+          fi
+
+          failures=0
+          for image in "${images[@]}"; do
+            image_type="$(file -b "$image" 2>/dev/null || true)"
+            if [[ "$image_type" == PNG\ image\ data* ]]; then
+              continue
+            fi
+
+            failures=$((failures + 1))
+            echo "::error title=Invalid Garmin PNG asset::$image is $image_type, not PNG image data."
+            if sed -n '1p' "$image" 2>/dev/null | grep -q 'git-lfs.github.com/spec'; then
+              echo "::error title=Git LFS asset not downloaded::$image is still a Git LFS pointer. Ensure actions/checkout uses lfs: true and the repository has LFS bandwidth available."
+            fi
+          done
+
+          if [[ "$failures" -gt 0 ]]; then
+            exit 1
+          fi
+
+          echo "Verified ${#images[@]} Garmin PNG asset(s)."
 
       - name: Set up Java
         uses: actions/setup-java@v4
