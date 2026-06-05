@@ -23,15 +23,18 @@ jobs:
     runs-on: ${{ vars.GARMIN_RELEASE_RUNNER || 'ubuntu-latest' }}
     env:
       GARMIN_DEV_KEY_B64: ${{ secrets.GARMIN_DEV_KEY_B64 }}
-      GARMIN_SDK_URL: ${{ secrets.GARMIN_SDK_URL }}
+      GARMIN_SDK_URL: ${{ secrets.GARMIN_SDK_URL || vars.GARMIN_SDK_URL }}
 
     steps:
-      - name: Resolve release tag
+      - name: Resolve release inputs
         id: release
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
+          SOURCE_REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -39,8 +42,13 @@ jobs:
           set -euo pipefail
 
           tag=""
+          checkout_ref="$SOURCE_REF"
+          upload_release_assets="false"
+
           if [[ "$EVENT_NAME" == "release" ]]; then
             tag="$RELEASE_TAG"
+            checkout_ref="$RELEASE_TAG"
+            upload_release_assets="true"
           elif [[ -n "$INPUT_TAG" ]]; then
             tag="$INPUT_TAG"
           elif [[ "$REF_TYPE" == "tag" ]]; then
@@ -48,16 +56,75 @@ jobs:
           fi
 
           if [[ -z "$tag" ]]; then
-            echo "::error title=Release tag required::Publish a GitHub Release or provide the workflow_dispatch tag input."
-            exit 1
+            tag="manual-$RUN_NUMBER"
+          fi
+
+          if [[ -z "$checkout_ref" ]]; then
+            checkout_ref="$COMMIT_SHA"
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+          echo "upload_release_assets=$upload_release_assets" >> "$GITHUB_OUTPUT"
 
-      - name: Check out release tag
+      - name: Install Git LFS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if command -v git-lfs >/dev/null 2>&1; then
+            git lfs version
+            exit 0
+          fi
+
+          if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y git-lfs
+            git lfs version
+            exit 0
+          fi
+
+          echo "::error title=Missing Git LFS::Install git-lfs on the release runner so Garmin PNG assets are downloaded instead of LFS pointer files."
+          exit 1
+
+      - name: Check out source ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ steps.release.outputs.checkout_ref }}
+          lfs: true
+
+      - name: Verify Garmin image assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image_dir="garmin/resources/drawables"
+          mapfile -t images < <(find "$image_dir" -maxdepth 1 -type f -name '*.png' | sort)
+
+          if [[ "${#images[@]}" -eq 0 ]]; then
+            echo "::error title=Missing Garmin PNG assets::No PNG files were found in $image_dir."
+            exit 1
+          fi
+
+          failures=0
+          for image in "${images[@]}"; do
+            image_type="$(file -b "$image" 2>/dev/null || true)"
+            if [[ "$image_type" == PNG\ image\ data* ]]; then
+              continue
+            fi
+
+            failures=$((failures + 1))
+            echo "::error title=Invalid Garmin PNG asset::$image is $image_type, not PNG image data."
+            if sed -n '1p' "$image" 2>/dev/null | grep -q 'git-lfs.github.com/spec'; then
+              echo "::error title=Git LFS asset not downloaded::$image is still a Git LFS pointer. Ensure actions/checkout uses lfs: true and the repository has LFS bandwidth available."
+            fi
+          done
+
+          if [[ "$failures" -gt 0 ]]; then
+            exit 1
+          fi
+
+          echo "Verified ${#images[@]} Garmin PNG asset(s)."
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -93,17 +160,68 @@ jobs:
             sdk_dir="$RUNNER_TEMP/connectiq-sdk"
 
             mkdir -p "$sdk_dir"
-            curl -fsSL "$GARMIN_SDK_URL" -o "$sdk_zip"
+            if [[ "$GARMIN_SDK_URL" == *"drive.google.com"* || "$GARMIN_SDK_URL" == *"drive.usercontent.google.com"* ]]; then
+              if ! command -v python3 >/dev/null 2>&1; then
+                echo "::error title=Python unavailable::Google Drive SDK downloads require python3 so the workflow can install gdown. Use a direct zip URL or a runner with python3 installed."
+                exit 1
+              fi
+
+              if ! python3 -m pip install --user --quiet gdown; then
+                python3 -m pip install --user --quiet --break-system-packages gdown
+              fi
+              python3 -m gdown --quiet "$GARMIN_SDK_URL" -O "$sdk_zip"
+            else
+              curl -fsSL --retry 3 --retry-delay 5 "$GARMIN_SDK_URL" -o "$sdk_zip"
+            fi
+
+            if ! unzip -Z1 "$sdk_zip" >/dev/null 2>&1; then
+              downloaded_size="$(wc -c < "$sdk_zip" | tr -d ' ')"
+              downloaded_type="$(file -b "$sdk_zip" 2>/dev/null || true)"
+              if [[ -z "$downloaded_type" ]]; then
+                downloaded_type="unknown file type"
+              fi
+
+              if [[ "$GARMIN_SDK_URL" == *"drive.google.com"* || "$GARMIN_SDK_URL" == *"drive.usercontent.google.com"* ]]; then
+                echo "::error title=Downloaded SDK is not a zip::Google Drive returned $downloaded_type ($downloaded_size bytes), not the SDK zip. Confirm the Drive file is shared with anyone who has the link and is not blocked by quota or permissions."
+              else
+                echo "::error title=Downloaded SDK is not a zip::GARMIN_SDK_URL returned $downloaded_type ($downloaded_size bytes), not a zip archive."
+              fi
+              exit 1
+            fi
+
             unzip -q "$sdk_zip" -d "$sdk_dir"
+
+            connectiq_home="$HOME/.Garmin/ConnectIQ"
+            mkdir -p "$connectiq_home"
 
             monkeyc="$(find "$sdk_dir" -type f -path '*/bin/monkeyc' | sort | tail -n 1)"
             if [[ -z "$monkeyc" ]]; then
-              echo "::error title=monkeyc not found::GARMIN_SDK_URL did not unpack to a Connect IQ SDK containing bin/monkeyc."
+              sdkmanager="$(find "$sdk_dir" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)"
+              if [[ -n "$sdkmanager" ]]; then
+                echo "::error title=SDK Manager URL supplied::GARMIN_SDK_URL points to Garmin's SDK Manager app, not a Connect IQ SDK. Use SDK Manager locally to download the Linux Connect IQ SDK, then provide a zip that contains bin/monkeyc, or use a self-hosted runner with monkeyc preinstalled."
+              else
+                echo "::error title=monkeyc not found::GARMIN_SDK_URL must unpack to a Linux Connect IQ SDK archive containing Sdks/<sdk>/bin/monkeyc or any */bin/monkeyc path."
+              fi
               exit 1
+            fi
+
+            devices_dir="$(find "$sdk_dir" -type d -name Devices | sort | head -n 1)"
+            if [[ -n "$devices_dir" ]]; then
+              rm -rf "$connectiq_home/Devices"
+              ln -s "$devices_dir" "$connectiq_home/Devices"
+            else
+              echo "::warning title=Garmin device definitions not found::GARMIN_SDK_URL did not include a Devices directory. Multi-device release builds may fail with invalid device ids."
+            fi
+
+            sdk_root="$(dirname "$(dirname "$monkeyc")")"
+            echo "$sdk_root" > "$connectiq_home/current-sdk.cfg"
+            if [[ -f "$sdk_root/bin/default.jungle" && -d "$connectiq_home/Devices" ]]; then
+              sed -i "s|^devicesPath = .*|devicesPath = \"$connectiq_home/Devices\"|" "$sdk_root/bin/default.jungle"
             fi
 
             chmod +x "$monkeyc"
             echo "MONKEYC=$monkeyc" >> "$GITHUB_ENV"
+            echo "CONNECTIQ_SDK_HOME=$sdk_root" >> "$GITHUB_ENV"
             exit 0
           fi
 
@@ -115,13 +233,67 @@ jobs:
 
           for candidate in "${candidates[@]}"; do
             if [[ -x "$candidate" ]]; then
+              candidate_sdk_root="$(dirname "$(dirname "$candidate")")"
               echo "MONKEYC=$candidate" >> "$GITHUB_ENV"
+              echo "CONNECTIQ_SDK_HOME=$candidate_sdk_root" >> "$GITHUB_ENV"
               exit 0
             fi
           done
 
           echo "::error title=Garmin SDK not found::Set GARMIN_SDK_URL to a Linux Connect IQ SDK zip URL or use a self-hosted runner with monkeyc installed."
           exit 1
+
+      - name: Inspect Garmin Connect IQ environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${MONKEYC:-}" || ! -x "$MONKEYC" ]]; then
+            echo "::error title=monkeyc unavailable::MONKEYC is not set to an executable file."
+            exit 1
+          fi
+
+          sdk_root="${CONNECTIQ_SDK_HOME:-$(dirname "$(dirname "$MONKEYC")")}"
+          connectiq_home="$HOME/.Garmin/ConnectIQ"
+
+          echo "::group::Garmin SDK diagnostics"
+          echo "SDK root: $sdk_root"
+          echo "MonkeyC: $MONKEYC"
+          "$MONKEYC" --version
+          java -version
+
+          if [[ -f "$sdk_root/bin/monkeybrains.jar" ]]; then
+            echo "monkeybrains.jar: present"
+          else
+            echo "::warning title=Missing monkeybrains.jar::Expected $sdk_root/bin/monkeybrains.jar to exist."
+          fi
+
+          if [[ -f "$sdk_root/bin/default.jungle" ]]; then
+            devices_path_line="$(sed -nE 's/^devicesPath = (.*)$/\1/p' "$sdk_root/bin/default.jungle" | tr '\n' ' ')"
+            echo "default.jungle devicesPath: ${devices_path_line:-not set}"
+          else
+            echo "::warning title=Missing default.jungle::Expected $sdk_root/bin/default.jungle to exist."
+          fi
+
+          if [[ -f "$connectiq_home/current-sdk.cfg" ]]; then
+            echo "current-sdk.cfg: $(tr '\n' ' ' < "$connectiq_home/current-sdk.cfg")"
+          else
+            echo "::warning title=Missing current-sdk.cfg::$connectiq_home/current-sdk.cfg does not exist."
+          fi
+
+          if [[ -d "$connectiq_home/Devices" ]]; then
+            device_count="$(find -L "$connectiq_home/Devices" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+            echo "Devices path: $connectiq_home/Devices"
+            echo "Device definitions: $device_count"
+            if [[ "$device_count" -eq 0 ]]; then
+              echo "::error title=Empty Garmin device definitions::No device definition directories were found in $connectiq_home/Devices."
+              exit 1
+            fi
+          else
+            echo "::error title=Missing Garmin device definitions::$connectiq_home/Devices does not exist."
+            exit 1
+          fi
+          echo "::endgroup::"
 
       - name: Decode Garmin developer key
         shell: bash
@@ -134,12 +306,48 @@ jobs:
           fi
 
           key_path="$RUNNER_TEMP/garmin_developer_key"
-          printf '%s' "$GARMIN_DEV_KEY_B64" | base64 --decode > "$key_path"
+          if ! printf '%s' "$GARMIN_DEV_KEY_B64" | base64 --decode > "$key_path"; then
+            echo "::error title=Invalid GARMIN_DEV_KEY_B64::The GARMIN_DEV_KEY_B64 secret is not valid base64. Recreate it with: base64 < \"\$HOME/.Garmin/developer_key\" | tr -d '\\n'"
+            exit 1
+          fi
+
+          if [[ ! -s "$key_path" ]]; then
+            echo "::error title=Empty Garmin developer key::GARMIN_DEV_KEY_B64 decoded to an empty file. Recreate the secret from your Garmin developer key file."
+            exit 1
+          fi
+
           chmod 600 "$key_path"
+          key_size="$(wc -c < "$key_path" | tr -d ' ')"
+          key_type="$(file -b "$key_path" 2>/dev/null || true)"
+          if [[ -z "$key_type" ]]; then
+            key_type="unknown file type"
+          fi
+
+          echo "Decoded Garmin developer key: $key_size bytes ($key_type)"
+          if command -v openssl >/dev/null 2>&1; then
+            if openssl pkey -inform DER -in "$key_path" -noout >/dev/null 2>&1; then
+              echo "Developer key validation: DER private key"
+            elif openssl pkey -inform PEM -in "$key_path" -noout >/dev/null 2>&1; then
+              echo "::warning title=PEM Garmin developer key::The decoded key is PEM. If MonkeyC rejects it, convert it to DER before updating GARMIN_DEV_KEY_B64."
+            else
+              echo "::error title=Invalid Garmin developer key::GARMIN_DEV_KEY_B64 decoded successfully, but the result is not a DER or PEM private key. Recreate it with: base64 < \"\$HOME/.Garmin/developer_key\" | tr -d '\\n'"
+              exit 1
+            fi
+          else
+            echo "::warning title=OpenSSL unavailable::Skipping Garmin developer key format validation."
+          fi
           echo "GARMIN_DEV_KEY=$key_path" >> "$GITHUB_ENV"
 
-      - name: Build per-device PRG files
-        run: bash tools/build_garmin.sh release --key "$GARMIN_DEV_KEY"
+      - name: Build Garmin PRG and IQ files
+        run: bash tools/build_garmin.sh all --key "$GARMIN_DEV_KEY"
+
+      - name: Upload Garmin build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garmin-build-logs-${{ steps.release.outputs.tag }}
+          path: build/garmin/logs/**
+          if-no-files-found: ignore
 
       - name: Package release assets
         id: package
@@ -153,14 +361,22 @@ jobs:
           release_dir="build/release"
           zip_name="oh-my-wrist-prg-${TAG}.zip"
           checksum_name="oh-my-wrist-prg-${TAG}.sha256"
+          iq_name="oh-my-wrist-${TAG}.iq"
+          iq_checksum_name="oh-my-wrist-iq-${TAG}.sha256"
 
           mkdir -p "$release_dir"
           mapfile -t prg_files < <(find "$garmin_dir" -maxdepth 1 -type f -name '*.prg' | sort)
           device_count="$(sed -nE 's/.*product id="([^"]+)".*/\1/p' garmin/manifest.xml | wc -l | tr -d ' ')"
           prg_count="${#prg_files[@]}"
+          iq_source="$garmin_dir/oh-my-wrist.iq"
 
           if [[ "$prg_count" -ne "$device_count" ]]; then
             echo "::error title=Unexpected PRG count::Built $prg_count .prg files, but manifest declares $device_count products."
+            exit 1
+          fi
+
+          if [[ ! -s "$iq_source" ]]; then
+            echo "::error title=Missing IQ package::Expected $iq_source to be built for Garmin Connect IQ Store upload."
             exit 1
           fi
 
@@ -169,12 +385,17 @@ jobs:
             zip -9 "../release/$zip_name" ./*.prg
           )
 
+          cp "$iq_source" "$release_dir/$iq_name"
+
           sha256sum "${prg_files[@]}" "$release_dir/$zip_name" > "$release_dir/$checksum_name"
+          sha256sum "$release_dir/$iq_name" > "$release_dir/$iq_checksum_name"
 
           echo "zip=$release_dir/$zip_name" >> "$GITHUB_OUTPUT"
           echo "checksums=$release_dir/$checksum_name" >> "$GITHUB_OUTPUT"
+          echo "iq=$release_dir/$iq_name" >> "$GITHUB_OUTPUT"
+          echo "iq_checksums=$release_dir/$iq_checksum_name" >> "$GITHUB_OUTPUT"
 
-      - name: Upload workflow artifact
+      - name: Upload PRG workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: oh-my-wrist-prg-${{ steps.release.outputs.tag }}
@@ -183,13 +404,25 @@ jobs:
             ${{ steps.package.outputs.checksums }}
           if-no-files-found: error
 
+      - name: Upload IQ workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oh-my-wrist-iq-${{ steps.release.outputs.tag }}
+          path: |
+            ${{ steps.package.outputs.iq }}
+            ${{ steps.package.outputs.iq_checksums }}
+          if-no-files-found: error
+
       - name: Upload GitHub Release assets
+        if: steps.release.outputs.upload_release_assets == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
           files: |
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.checksums }}
+            ${{ steps.package.outputs.iq }}
+            ${{ steps.package.outputs.iq_checksums }}
           fail_on_unmatched_files: true
           generate_release_notes: true
           overwrite_files: true

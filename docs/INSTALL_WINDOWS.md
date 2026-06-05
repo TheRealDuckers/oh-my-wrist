@@ -1,6 +1,6 @@
 # Windows Installation Guide
 
-Platform-specific setup for Oh-My-Wrist on Windows. For general installation steps, see the main [README](../README.md).
+Platform-specific setup for oh-my-wrist on Windows. For general installation steps, see the main [README](../README.md).
 
 ## Prerequisites
 

@@ -1,4 +1,4 @@
-// OhMyWristApp.mc — Application entry point for the Oh-My-Wrist widget.
+// OhMyWristApp.mc — Application entry point for the oh-my-wrist app.
 //
 // Responsibilities:
 //   - Initialise the BLE delegate on app start.
@@ -23,7 +23,7 @@ class OhMyWristApp extends Application.AppBase {
         AppBase.initialize();
     }
 
-    // Called by the system when the widget becomes active.
+    // Called by the system when the app becomes active.
     function onStart(state) {
         // Initialise the status model with default values.
         StatusModel.initialize();

@@ -33,7 +33,7 @@ class OhMyWristDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function _openMenu() {
-        var menu = new WatchUi.Menu2({ :title => "Oh-My-Wrist" });
+        var menu = new WatchUi.Menu2({ :title => "oh-my-wrist" });
         menu.addItem(
             new WatchUi.MenuItem(
                 WatchUi.loadResource(Rez.Strings.ConnectionIdMenuLabel),

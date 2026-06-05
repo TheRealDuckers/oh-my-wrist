@@ -1,6 +1,6 @@
 # Linux Installation Guide
 
-Platform-specific setup for Oh-My-Wrist on Linux. For general installation steps, see the main [README](../README.md).
+Platform-specific setup for oh-my-wrist on Linux. For general installation steps, see the main [README](../README.md).
 
 ## Prerequisites
 

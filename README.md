@@ -16,12 +16,12 @@
 ## Key Features
 
 - **Real-time BLE updates** — tool calls, file edits, and session state streamed to your watch
-- **Multi-provider** — supports Claude Code and OpenCode simultaneously
-- **Cross-platform** — runs on Linux, macOS, and Windows
 - **Haptic alerts** — vibration patterns for idle, session done, destructive commands, and agent completion
 - **CLI-styled watch UI** — terminal aesthetic with animated amber spinner, event stack, and per-provider stats
-- **Connection ID filter** — optional 0–255 ID keeps nearby users' watches from pairing with each other
+- **Multi-provider** — supports Claude Code and OpenCode simultaneously
+- **Cross-platform** — runs on Linux, macOS, and Windows
 - **Quiet hours** — suppress vibrations during configurable time windows
+- **Connection ID filter** — optional 0–255 ID keeps nearby users' watches from pairing with each other
 
 <p align="center">
   <img src="static/demo.gif" alt="oh-my-wrist Watch Demo"/>
@@ -192,7 +192,7 @@ Manifest product IDs: `approachs50`, `approachs7042mm`, `approachs7047mm`, `d2ai
 |---------|----------|
 | Watch can't find daemon | Run `oh-my-wrist status` — verify daemon is advertising and that desktop/watch connection IDs match. Restart with `oh-my-wrist stop && oh-my-wrist start`. From a source checkout, run `python tools/check_connection.py` with the watch app open to exercise live HISTORY, stats, and usage updates. |
 | Garmin app does not connect to daemon on PC | Make sure your Bluetooth adapter is supported. Some adapters or OS settings, such as Windows random MAC behavior, can prevent stable BLE connections. If problems persist, macOS or Linux is preferred. |
-| Garmin app does not start on watch | Create an empty `/GARMIN/Apps/Logs/garmin.log` file on the device, run the app, wait for the issue to occur, reconnect the device to your PC, download `garmin.log`, then create a GitHub issue with the log for debugging. |
+| Garmin app does not start on watch | Create an empty `/GARMIN/Apps/Logs/oh-my-wrist-YOUR_WATCH_ID.log (e.g oh-my-wrist-fenix7x.log)` file on the device, run the app, wait for the issue to occur, reconnect the device to your PC, download log file, then create a GitHub issue with the log for debugging. |
 | Hook not firing | Run `oh-my-wrist status` — confirm hooks in `~/.claude/settings.json`. Re-run `oh-my-wrist install`. |
 | OpenCode not updating | Check plugin: `oh-my-wrist opencode status`. Re-install: `oh-my-wrist opencode install`. |
 | BLE permission errors | See your platform guide: [Linux](docs/INSTALL_LINUX.md) · [macOS](docs/INSTALL_MACOS.md) · [Windows](docs/INSTALL_WINDOWS.md) |
