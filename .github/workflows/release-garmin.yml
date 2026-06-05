@@ -167,6 +167,7 @@ jobs:
 
             chmod +x "$monkeyc"
             echo "MONKEYC=$monkeyc" >> "$GITHUB_ENV"
+            echo "CONNECTIQ_SDK_HOME=$sdk_root" >> "$GITHUB_ENV"
             exit 0
           fi
 
@@ -178,13 +179,67 @@ jobs:
 
           for candidate in "${candidates[@]}"; do
             if [[ -x "$candidate" ]]; then
+              candidate_sdk_root="$(dirname "$(dirname "$candidate")")"
               echo "MONKEYC=$candidate" >> "$GITHUB_ENV"
+              echo "CONNECTIQ_SDK_HOME=$candidate_sdk_root" >> "$GITHUB_ENV"
               exit 0
             fi
           done
 
           echo "::error title=Garmin SDK not found::Set GARMIN_SDK_URL to a Linux Connect IQ SDK zip URL or use a self-hosted runner with monkeyc installed."
           exit 1
+
+      - name: Inspect Garmin Connect IQ environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${MONKEYC:-}" || ! -x "$MONKEYC" ]]; then
+            echo "::error title=monkeyc unavailable::MONKEYC is not set to an executable file."
+            exit 1
+          fi
+
+          sdk_root="${CONNECTIQ_SDK_HOME:-$(dirname "$(dirname "$MONKEYC")")}"
+          connectiq_home="$HOME/.Garmin/ConnectIQ"
+
+          echo "::group::Garmin SDK diagnostics"
+          echo "SDK root: $sdk_root"
+          echo "MonkeyC: $MONKEYC"
+          "$MONKEYC" --version
+          java -version
+
+          if [[ -f "$sdk_root/bin/monkeybrains.jar" ]]; then
+            echo "monkeybrains.jar: present"
+          else
+            echo "::warning title=Missing monkeybrains.jar::Expected $sdk_root/bin/monkeybrains.jar to exist."
+          fi
+
+          if [[ -f "$sdk_root/bin/default.jungle" ]]; then
+            devices_path_line="$(sed -nE 's/^devicesPath = (.*)$/\1/p' "$sdk_root/bin/default.jungle" | tr '\n' ' ')"
+            echo "default.jungle devicesPath: ${devices_path_line:-not set}"
+          else
+            echo "::warning title=Missing default.jungle::Expected $sdk_root/bin/default.jungle to exist."
+          fi
+
+          if [[ -f "$connectiq_home/current-sdk.cfg" ]]; then
+            echo "current-sdk.cfg: $(tr '\n' ' ' < "$connectiq_home/current-sdk.cfg")"
+          else
+            echo "::warning title=Missing current-sdk.cfg::$connectiq_home/current-sdk.cfg does not exist."
+          fi
+
+          if [[ -d "$connectiq_home/Devices" ]]; then
+            device_count="$(find -L "$connectiq_home/Devices" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+            echo "Devices path: $connectiq_home/Devices"
+            echo "Device definitions: $device_count"
+            if [[ "$device_count" -eq 0 ]]; then
+              echo "::error title=Empty Garmin device definitions::No device definition directories were found in $connectiq_home/Devices."
+              exit 1
+            fi
+          else
+            echo "::error title=Missing Garmin device definitions::$connectiq_home/Devices does not exist."
+            exit 1
+          fi
+          echo "::endgroup::"
 
       - name: Decode Garmin developer key
         shell: bash
@@ -208,10 +263,37 @@ jobs:
           fi
 
           chmod 600 "$key_path"
+          key_size="$(wc -c < "$key_path" | tr -d ' ')"
+          key_type="$(file -b "$key_path" 2>/dev/null || true)"
+          if [[ -z "$key_type" ]]; then
+            key_type="unknown file type"
+          fi
+
+          echo "Decoded Garmin developer key: $key_size bytes ($key_type)"
+          if command -v openssl >/dev/null 2>&1; then
+            if openssl pkey -inform DER -in "$key_path" -noout >/dev/null 2>&1; then
+              echo "Developer key validation: DER private key"
+            elif openssl pkey -inform PEM -in "$key_path" -noout >/dev/null 2>&1; then
+              echo "::warning title=PEM Garmin developer key::The decoded key is PEM. If MonkeyC rejects it, convert it to DER before updating GARMIN_DEV_KEY_B64."
+            else
+              echo "::error title=Invalid Garmin developer key::GARMIN_DEV_KEY_B64 decoded successfully, but the result is not a DER or PEM private key. Recreate it with: base64 < \"\$HOME/.Garmin/developer_key\" | tr -d '\\n'"
+              exit 1
+            fi
+          else
+            echo "::warning title=OpenSSL unavailable::Skipping Garmin developer key format validation."
+          fi
           echo "GARMIN_DEV_KEY=$key_path" >> "$GITHUB_ENV"
 
       - name: Build per-device PRG files
         run: bash tools/build_garmin.sh release --key "$GARMIN_DEV_KEY"
+
+      - name: Upload Garmin build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garmin-build-logs-${{ steps.release.outputs.tag }}
+          path: build/garmin/logs/**
+          if-no-files-found: ignore
 
       - name: Package release assets
         id: package

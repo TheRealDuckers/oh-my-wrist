@@ -6,7 +6,49 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 JUNGLE="$REPO_ROOT/garmin/monkey.jungle"
 MANIFEST="$REPO_ROOT/garmin/manifest.xml"
 OUT_DIR="$REPO_ROOT/build/garmin"
+LOG_DIR="$OUT_DIR/logs"
 APP_NAME="oh-my-wrist"
+MAX_FAILURE_LOGS="${GARMIN_BUILD_MAX_FAILURE_LOGS:-5}"
+
+if ! [[ "$MAX_FAILURE_LOGS" =~ ^[0-9]+$ ]]; then
+    echo "Warning: GARMIN_BUILD_MAX_FAILURE_LOGS must be a non-negative integer; using 5." >&2
+    MAX_FAILURE_LOGS=5
+fi
+
+print_failure_log() {
+    local name="$1"
+    local log_file="$2"
+    local max_lines="${GARMIN_BUILD_LOG_PREVIEW_LINES:-240}"
+
+    if ! [[ "$max_lines" =~ ^[0-9]+$ ]]; then
+        max_lines=240
+    fi
+
+    echo "::group::MonkeyC failure: $name"
+    if [[ -s "$log_file" ]]; then
+        sed -n "1,${max_lines}p" "$log_file"
+        local line_count
+        line_count="$(wc -l < "$log_file" | tr -d ' ')"
+        if (( line_count > max_lines )); then
+            echo "... log preview truncated to ${max_lines} lines. Full log: $log_file"
+        fi
+    else
+        echo "No compiler output captured. Log file: $log_file"
+    fi
+    echo "::endgroup::"
+}
+
+record_failure() {
+    local name="$1"
+    local log_file="$2"
+
+    FAILED+=("$name")
+    if (( ${#FAILED[@]} <= MAX_FAILURE_LOGS )); then
+        print_failure_log "$name" "$log_file"
+    elif (( ${#FAILED[@]} == MAX_FAILURE_LOGS + 1 )); then
+        echo "Additional failure logs suppressed in console. Full logs are in $LOG_DIR"
+    fi
+}
 
 # --- Find monkeyc -----------------------------------------------------------
 
@@ -113,6 +155,8 @@ echo "Devices: ${#DEVICES[@]} (${DEVICES[*]})"
 echo ""
 
 mkdir -p "$OUT_DIR"
+rm -rf "$LOG_DIR"
+mkdir -p "$LOG_DIR"
 
 if [[ "$MODE" == "release" || "$MODE" == "all" ]]; then
     rm -f "$OUT_DIR"/*.prg
@@ -129,18 +173,26 @@ if [[ "$MODE" == "release" || "$MODE" == "all" ]]; then
     echo "=== Building per-device .prg files ==="
     for device in "${DEVICES[@]}"; do
         outfile="$OUT_DIR/${APP_NAME}-${device}.prg"
+        log_file="$LOG_DIR/${device}.log"
         printf "  %-20s " "$device"
-        if "$MONKEYC" \
-            -d "$device" \
-            -f "$JUNGLE" \
-            -o "$outfile" \
-            -y "$DEV_KEY" \
-            -r &>/dev/null; then
+        if {
+            echo "monkeyc=$MONKEYC"
+            echo "device=$device"
+            echo "jungle=$JUNGLE"
+            echo "output=$outfile"
+            echo ""
+            "$MONKEYC" \
+                -d "$device" \
+                -f "$JUNGLE" \
+                -o "$outfile" \
+                -y "$DEV_KEY" \
+                -r
+        } >"$log_file" 2>&1; then
             size=$(stat --printf="%s" "$outfile" 2>/dev/null || stat -f%z "$outfile")
             echo "OK  $(( size / 1024 ))K"
         else
             echo "FAILED"
-            FAILED+=("$device")
+            record_failure "$device" "$log_file"
             rm -f "$outfile"
         fi
     done
@@ -152,17 +204,25 @@ fi
 if [[ "$MODE" == "store" || "$MODE" == "all" ]]; then
     echo "=== Building .iq store package ==="
     iq_file="$OUT_DIR/${APP_NAME}.iq"
-    if "$MONKEYC" \
-        -e \
-        -f "$JUNGLE" \
-        -o "$iq_file" \
-        -y "$DEV_KEY" \
-        -r &>/dev/null; then
+    log_file="$LOG_DIR/iq-package.log"
+    if {
+        echo "monkeyc=$MONKEYC"
+        echo "package=iq"
+        echo "jungle=$JUNGLE"
+        echo "output=$iq_file"
+        echo ""
+        "$MONKEYC" \
+            -e \
+            -f "$JUNGLE" \
+            -o "$iq_file" \
+            -y "$DEV_KEY" \
+            -r
+    } >"$log_file" 2>&1; then
         size=$(stat --printf="%s" "$iq_file" 2>/dev/null || stat -f%z "$iq_file")
         echo "  ${APP_NAME}.iq  OK  $(( size / 1024 ))K"
     else
         echo "  ${APP_NAME}.iq  FAILED"
-        FAILED+=("iq-package")
+        record_failure "iq-package" "$log_file"
         rm -f "$iq_file"
     fi
     echo ""
@@ -175,6 +235,7 @@ rm -rf "$OUT_DIR"/gen "$OUT_DIR"/internal-mir "$OUT_DIR"/mir
 rm -f "$OUT_DIR"/*.debug.xml
 
 echo "=== Output ==="
+echo "Compiler logs: $LOG_DIR"
 ARTIFACTS=()
 for artifact in "$OUT_DIR"/*.prg "$OUT_DIR"/*.iq; do
     if [[ -e "$artifact" ]]; then
