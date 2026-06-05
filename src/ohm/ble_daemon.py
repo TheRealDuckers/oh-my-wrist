@@ -91,6 +91,57 @@ from ohm.protocol import (
 from ohm.provider_types import CanonicalEvent
 from ohm.session_state import MultiProviderSessionState
 
+_bless_discoverable_patched = False
+
+
+def _patch_bless_le_discoverable() -> None:
+    global _bless_discoverable_patched
+    if _bless_discoverable_patched or sys.platform != "linux":
+        return
+    _bless_discoverable_patched = True
+
+    try:
+        from bless.backends.bluezdbus.dbus.advertisement import (
+            BlueZLEAdvertisement,
+            Type,
+        )
+        from bless.backends.bluezdbus.dbus.application import BlueZGattApplication
+        from dbus_next.service import dbus_property as _dbus_property
+
+        class _DiscoverableLEAdvertisement(BlueZLEAdvertisement):
+            """BlueZLEAdvertisement with the Discoverable D-Bus property."""
+
+            def __init__(self, advertising_type, index, app):
+                super().__init__(advertising_type, index, app)
+                self._discoverable = True
+
+            @_dbus_property()
+            def Discoverable(self) -> "b":  # type: ignore[override]  # noqa: N802
+                return self._discoverable
+
+            @Discoverable.setter  # type: ignore
+            def Discoverable(self, value: "b"):  # type: ignore  # noqa: N802
+                self._discoverable = value
+
+        _orig_start_advertising = BlueZGattApplication.start_advertising
+
+        async def _start_advertising_discoverable(self, adapter):  # type: ignore[override]
+            await self.set_name(adapter, self.app_name)
+            advertisement = _DiscoverableLEAdvertisement(
+                Type.PERIPHERAL, len(self.advertisements) + 1, self
+            )
+            self.advertisements.append(advertisement)
+            advertisement._service_uuids.append(self.services[0].UUID)
+            self.bus.export(advertisement.path, advertisement)
+            iface = adapter.get_interface("org.bluez.LEAdvertisingManager1")
+            await iface.call_register_advertisement(advertisement.path, {})
+
+        BlueZGattApplication.start_advertising = _start_advertising_discoverable  # type: ignore[assignment]
+        logger.info("Patched bless LEAdvertisement with Discoverable=true")
+    except Exception as exc:
+        logger.warning("Failed to patch bless Discoverable flag: {}", exc)
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -282,6 +333,7 @@ class BleDaemon:
 
     async def _setup_ble(self, connection_id: int | None = None) -> None:
         """Initialise bless server and register the GATT service."""
+        _patch_bless_le_discoverable()
         cfg = load_config()
         old_connection_id = self._connection_id
         old_service_uuid = self._service_uuid

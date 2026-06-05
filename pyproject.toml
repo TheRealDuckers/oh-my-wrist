@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oh-my-wrist"
-version = "0.1.0"
+version = "0.1.1"
 description = "Display real-time AI coding assistant activity on a Garmin smartwatch via BLE."
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -70,3 +70,4 @@ src = ["src", "tests", "tools"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/ohm/platform/bluez_agent.py" = ["F821"]  # dbus_next D-Bus type signatures
+"src/ohm/ble_daemon.py" = ["F821"]  # dbus_next D-Bus type signatures
