@@ -65,7 +65,7 @@ oh-my-wrist install --provider opencode
 Install it one of two ways:
 
 1. GitHub Releases: download `oh-my-wrist-prg-<version>.zip` from the latest release, unzip it, connect your Garmin device over USB, then copy the matching `oh-my-wrist-<device-id>.prg` file to `/GARMIN/Apps/`.
-2. Connect IQ Store: link coming soon.
+2. Connect IQ Store: [DOWNLOAD](https://apps.garmin.com/en-US/apps/1fff0ec7-4813-4f94-8d24-3dc9fef0b9df)
 3. Build from source: install Connect IQ SDK 9.1+, then run `tools/build_garmin.sh release` and copy the generated device-specific `.prg` file from `build/garmin/` to `/GARMIN/Apps/`. VS Code single-device builds from `garmin/` write `bin/oh-my-wrist.prg`.
 
 ### 4. Start coding
