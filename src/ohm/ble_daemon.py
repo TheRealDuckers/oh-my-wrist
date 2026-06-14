@@ -321,6 +321,9 @@ class BleDaemon:
         # from the connected central.  Notifications are suppressed until this
         # is set — per BLE spec, peripherals must not notify before subscribe.
         self._has_subscribers: bool = False
+        # macOS: detect CCCD subscribes via the connection monitor
+        # (CoreBluetooth never calls write_request_func for CCCD writes).
+        self._corebluetooth_subscribe_via_monitor: bool = False
         # BlueZ pairing agent (Linux only) — kept alive for daemon lifetime.
         # _agent_bus: dbus_next connection (preferred)
         # _agent_process: bluetoothctl subprocess (fallback)
@@ -347,26 +350,28 @@ class BleDaemon:
         server.read_request_func = self._handle_read
         server.write_request_func = self._handle_write
 
-        # On Linux/BlueZ, CCCD subscribes (StartNotify) are handled internally
-        # by bless via D-Bus and never reach _handle_write. Hook into the
-        # StartNotify callback so we detect when the watch subscribes.
+        # CCCD subscribes are handled natively on Linux (BlueZ D-Bus
+        # StartNotify) and macOS (CoreBluetooth didSubscribeToCharacteristic)
+        # — neither reaches _handle_write. Install platform hooks so we
+        # detect when the watch subscribes.
         if sys.platform == "linux":
             self._hook_bluez_start_notify()
+        elif sys.platform == "darwin":
+            self._corebluetooth_subscribe_via_monitor = True
 
         await server.add_new_service(target_service_uuid)
 
-        # HISTORY characteristic — Read + Notify.  Each notification is one
-        # binary frame (≤ MAX_FRAME_LEN bytes).  The watch maintains the
-        # history deque locally.
+        # Notify-capable characteristics must NOT have a cached value on
+        # macOS CoreBluetooth — pass None here, seed after server.start().
         await server.add_new_characteristic(
             target_service_uuid,
             HISTORY_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
-            self._last_frame,
+            None,
             GATTAttributePermissions.readable,
         )
 
-        # SESSION characteristic — Read only
+        # SESSION characteristic — Read only (cached value is fine)
         await server.add_new_characteristic(
             target_service_uuid,
             SESSION_CHAR_UUID,
@@ -375,42 +380,56 @@ class BleDaemon:
             GATTAttributePermissions.readable,
         )
 
-        # ALERT characteristic — Read + Notify
         await server.add_new_characteristic(
             target_service_uuid,
             ALERT_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
-            self._current_alert,
+            None,
             GATTAttributePermissions.readable,
         )
 
-        # Per-provider STATS characteristics — Read + Notify
         await server.add_new_characteristic(
             target_service_uuid,
             STATS_CLAUDE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
-            self._multi.payload_for("claude"),
+            None,
             GATTAttributePermissions.readable,
         )
         await server.add_new_characteristic(
             target_service_uuid,
             STATS_OPENCODE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
-            self._multi.payload_for("opencode"),
+            None,
             GATTAttributePermissions.readable,
         )
 
-        # USAGE characteristic — Read + Notify (Claude quota bars)
         await server.add_new_characteristic(
             target_service_uuid,
             USAGE_CHAR_UUID,
             GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify,
-            self._usage_payload(),
+            None,
             GATTAttributePermissions.readable,
         )
 
         try:
             await server.start()
+
+            # Seed initial values now that the service is live.
+            server.get_characteristic(HISTORY_CHAR_UUID).value = bytearray(
+                self._last_frame
+            )
+            server.get_characteristic(ALERT_CHAR_UUID).value = bytearray(
+                self._current_alert
+            )
+            server.get_characteristic(STATS_CLAUDE_CHAR_UUID).value = bytearray(
+                self._multi.payload_for("claude")
+            )
+            server.get_characteristic(STATS_OPENCODE_CHAR_UUID).value = bytearray(
+                self._multi.payload_for("opencode")
+            )
+            server.get_characteristic(USAGE_CHAR_UUID).value = bytearray(
+                self._usage_payload()
+            )
             self._server = server
             self._connection_id = target_connection_id
             self._service_uuid = target_service_uuid
@@ -948,6 +967,9 @@ class BleDaemon:
                         is_adv,
                         self._subscribe_settling,
                     )
+                    if self._corebluetooth_subscribe_via_monitor:
+                        self._has_subscribers = True
+                        self._schedule_deferred_push()
                     try:
                         await self._log_connection_parameters()
                     except Exception as exc:

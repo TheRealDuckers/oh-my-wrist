@@ -22,9 +22,14 @@ import pytest
 from ohm.icons import FLAG_SPINNER, IconId
 from ohm.protocol import (
     OHM_SERVICE_UUID,
+    ALERT_CHAR_UUID,
     HISTORY_CHAR_UUID,
     MAX_FRAME_LEN,
     PROTOCOL_VERSION,
+    SESSION_CHAR_UUID,
+    STATS_CLAUDE_CHAR_UUID,
+    STATS_OPENCODE_CHAR_UUID,
+    USAGE_CHAR_UUID,
     service_uuid_for_connection_id,
 )
 from ohm.provider_types import CanonicalEvent
@@ -147,6 +152,71 @@ class TestPushEvent:
                 call.args[0] == expected_uuid
                 for call in mock_server.add_new_characteristic.await_args_list
             )
+
+        asyncio.run(_run())
+
+    def test_setup_ble_notify_chars_have_no_cached_value_on_macos(self):
+        """Regression: macOS CoreBluetooth rejects a cached value on notify
+        characteristics ("Characteristics with cached values must be
+        read-only"). The five notify-capable chars must be registered with
+        value=None and seeded after server.start(); SESSION (read-only) keeps
+        its cached value."""
+        mock_server = MagicMock()
+        mock_server.add_new_service = AsyncMock()
+        mock_server.add_new_characteristic = AsyncMock()
+        mock_server.start = AsyncMock()
+
+        class _Properties(IntFlag):
+            read = 1
+            notify = 2
+
+        class _Permissions(IntFlag):
+            readable = 1
+
+        bless_server = MagicMock(return_value=mock_server)
+        notify_uuids = {
+            HISTORY_CHAR_UUID,
+            ALERT_CHAR_UUID,
+            STATS_CLAUDE_CHAR_UUID,
+            STATS_OPENCODE_CHAR_UUID,
+            USAGE_CHAR_UUID,
+        }
+
+        async def _run():
+            import ohm.ble_daemon as ble_daemon
+
+            with (
+                patch.object(ble_daemon, "BlessServer", bless_server),
+                patch.object(ble_daemon, "GATTCharacteristicProperties", _Properties),
+                patch.object(ble_daemon, "GATTAttributePermissions", _Permissions),
+                patch.object(ble_daemon, "load_config") as load_config,
+                patch.object(ble_daemon.sys, "platform", "darwin"),
+            ):
+                load_config.return_value = MagicMock(connection_id=42)
+                daemon = ble_daemon.BleDaemon()
+                await daemon._setup_ble()
+
+            # add_new_characteristic(service_uuid, char_uuid, props, value, perms)
+            values_by_uuid = {
+                call.args[1]: call.args[3]
+                for call in mock_server.add_new_characteristic.await_args_list
+            }
+            # Notify-capable chars must carry NO cached value on CoreBluetooth.
+            for uuid in notify_uuids:
+                assert values_by_uuid[uuid] is None, uuid
+            # SESSION is read-only, so a cached value is allowed (and supplied).
+            assert values_by_uuid[SESSION_CHAR_UUID] is not None
+
+            # macOS detects CCCD subscribes via the connection monitor instead
+            # of write_request_func.
+            assert daemon._corebluetooth_subscribe_via_monitor is True
+
+            # Each notify char is seeded post-start via get_characteristic().
+            seeded = {
+                call.args[0] for call in mock_server.get_characteristic.call_args_list
+            }
+            for uuid in notify_uuids:
+                assert uuid in seeded, uuid
 
         asyncio.run(_run())
 
